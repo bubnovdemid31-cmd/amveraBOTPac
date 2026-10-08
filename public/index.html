@@ -1,608 +1,996 @@
-// server.js
-require("dotenv").config();
-
-const path = require("path");
-const crypto = require("crypto");
-const express = require("express");
-const { Telegraf } = require("telegraf");
-const { DatabaseSync } = require("node:sqlite");
-
-// ============== КОНФИГ ==============
-const BOT_TOKEN = process.env.BOT_TOKEN;
-const ADMIN_IDS = (process.env.ADMIN_IDS || "")
-  .split(",")
-  .map((s) => parseInt(s.trim(), 10))
-  .filter(Boolean);
-const PORT = parseInt(process.env.PORT || "3000", 10);
-const WEBAPP_URL = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
-const CNY_RATE_DEFAULT = parseFloat(process.env.CNY_RATE_DEFAULT || "12.5");
-const DELIVERY_PRICE = parseFloat(process.env.DELIVERY_PRICE || "599");
-const COMMISSION_PRICE = parseFloat(process.env.COMMISSION_PRICE || "550");
-
-// Путь к БД — на Amvera /data/poizon.db, локально ./poizon.db
-const DB_PATH = process.env.DB_PATH || "./poizon.db";
-
-if (!BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN не задан в переменных окружения");
-  process.exit(1);
-}
-
-console.log("🚀 Запуск Pacific Style Bot");
-console.log(`📂 База данных: ${DB_PATH}`);
-console.log(`🌐 Mini App URL: ${WEBAPP_URL}`);
-
-// ============== БАЗА ДАННЫХ ==============
-const db = new DatabaseSync(DB_PATH);
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA foreign_keys = ON;");
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER UNIQUE NOT NULL,
-    username TEXT,
-    first_name TEXT DEFAULT '',
-    phone TEXT,
-    is_admin INTEGER DEFAULT 0,
-    bonus_points INTEGER DEFAULT 0,
-    referred_by INTEGER,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    status TEXT DEFAULT 'created',
-    commission REAL DEFAULT 550,
-    delivery REAL DEFAULT 599,
-    cny_rate REAL DEFAULT 12.5,
-    total_rub REAL DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now')),
-    closed_at TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    order_id INTEGER NOT NULL,
-    title TEXT DEFAULT '',
-    url TEXT DEFAULT '',
-    photo_url TEXT DEFAULT '',
-    price_cny REAL DEFAULT 0,
-    quantity INTEGER DEFAULT 1,
-    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS bonus_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    amount INTEGER NOT NULL,
-    reason TEXT,
-    admin_id INTEGER,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS referrals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    inviter_id INTEGER NOT NULL,
-    invited_id INTEGER NOT NULL,
-    bonus_awarded INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// Курс по умолчанию
-const rateRow = db.prepare("SELECT value FROM settings WHERE key = 'cny_rate'").get();
-if (!rateRow) {
-  db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
-    "cny_rate",
-    String(CNY_RATE_DEFAULT)
-  );
-  console.log(`💱 Установлен курс по умолчанию: ${CNY_RATE_DEFAULT}`);
-}
-
-// ============== ХЕЛПЕРЫ БД ==============
-const q = {
-  getUser: db.prepare("SELECT * FROM users WHERE telegram_id = ?"),
-  getUserById: db.prepare("SELECT * FROM users WHERE id = ?"),
-  createUser: db.prepare(`
-    INSERT INTO users (telegram_id, username, first_name, is_admin, referred_by)
-    VALUES (?, ?, ?, ?, ?)
-  `),
-  updatePhone: db.prepare("UPDATE users SET phone = ? WHERE id = ?"),
-  listUsers: db.prepare("SELECT * FROM users ORDER BY created_at DESC"),
-  setAdmin: db.prepare("UPDATE users SET is_admin = ? WHERE id = ?"),
-  addBonus: db.prepare("UPDATE users SET bonus_points = bonus_points + ? WHERE id = ?"),
-  logBonus: db.prepare(`
-    INSERT INTO bonus_log (user_id, amount, reason, admin_id)
-    VALUES (?, ?, ?, ?)
-  `),
-  bonusLog: db.prepare(`
-    SELECT * FROM bonus_log WHERE user_id = ? ORDER BY created_at DESC LIMIT 30
-  `),
-  getRate: db.prepare("SELECT value FROM settings WHERE key = 'cny_rate'"),
-  setRate: db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('cny_rate', ?)"),
-  userOrders: db.prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC"),
-  orderById: db.prepare("SELECT * FROM orders WHERE id = ?"),
-  orderProducts: db.prepare("SELECT * FROM products WHERE order_id = ?"),
-  listOrders: db.prepare("SELECT * FROM orders ORDER BY created_at DESC"),
-  createOrder: db.prepare(`
-    INSERT INTO orders (user_id, commission, delivery, cny_rate, total_rub)
-    VALUES (?, ?, ?, ?, ?)
-  `),
-  createProduct: db.prepare(`
-    INSERT INTO products (order_id, title, url, photo_url, price_cny, quantity)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `),
-  setStatus: db.prepare("UPDATE orders SET status = ?, closed_at = ? WHERE id = ?"),
-  setDelivery: db.prepare("UPDATE orders SET delivery = ?, total_rub = ? WHERE id = ?"),
-  createReferral: db.prepare(
-    "INSERT INTO referrals (inviter_id, invited_id) VALUES (?, ?)"
-  ),
-};
-
-function getCnyRate() {
-  const row = q.getRate.get();
-  return row ? parseFloat(row.value) : CNY_RATE_DEFAULT;
-}
-
-// ============== ПРОВЕРКА initData ==============
-function verifyInitData(initData) {
-  if (!initData) throw new Error("initData отсутствует");
-  const params = new URLSearchParams(initData);
-  const hash = params.get("hash");
-  if (!hash) throw new Error("Нет hash");
-  params.delete("hash");
-
-  const dataCheckString = [...params.entries()]
-    .map(([k, v]) => `${k}=${v}`)
-    .sort()
-    .join("\n");
-
-  const secretKey = crypto
-    .createHmac("sha256", "WebAppData")
-    .update(BOT_TOKEN)
-    .digest();
-
-  const calculated = crypto
-    .createHmac("sha256", secretKey)
-    .update(dataCheckString)
-    .digest("hex");
-
-  if (calculated !== hash) throw new Error("Неверная подпись");
-
-  const userJson = params.get("user");
-  if (!userJson) throw new Error("Нет user в initData");
-  return JSON.parse(userJson);
-}
-
-// ============== БОТ ==============
-const bot = new Telegraf(BOT_TOKEN);
-
-// Красивая плашка для сообщений
-const BRAND = `<b>Pacific Style</b>`;
-const DIVIDER = `━━━━━━━━━━━━━━━━━━━━`;
-
-// ---------- /start ----------
-bot.start(async (ctx) => {
-  const tg = ctx.from;
-  const payload = ctx.startPayload;
-  let referredBy = null;
-
-  if (payload && payload.startsWith("ref_")) {
-    const id = parseInt(payload.slice(4), 10);
-    if (!Number.isNaN(id) && id !== tg.id) referredBy = id;
-  }
-
-  let user = q.getUser.get(tg.id);
-  const isAdmin = ADMIN_IDS.includes(tg.id);
-
-  if (!user) {
-    const info = q.createUser.run(
-      tg.id,
-      tg.username || null,
-      tg.first_name || "друг",
-      isAdmin ? 1 : 0,
-      referredBy
-    );
-    user = q.getUserById.get(info.lastInsertRowid);
-
-    if (referredBy) {
-      q.createReferral.run(referredBy, tg.id);
-    }
-    console.log(`👤 Новый пользователь: ${tg.first_name} (${tg.id})`);
-  } else if (isAdmin && !user.is_admin) {
-    q.setAdmin.run(1, user.id);
-    user.is_admin = 1;
-  }
-
-  const greeting =
-    `👋 Привет, <b>${user.first_name}</b>!\n\n` +
-    `Добро пожаловать в ${BRAND} — сервис доставки товаров\n` +
-    `из <b>Китая</b>, <b>США</b> и стран <b>Запада</b>.\n\n` +
-    `${DIVIDER}\n` +
-    `🧮 <b>Что вы можете здесь:</b>\n\n` +
-    `• Рассчитать стоимость товара в калькуляторе\n` +
-    `• Оформить и отслеживать заказы\n` +
-    `• Следить за статусами доставки\n` +
-    `• Копить бонусные баллы\n` +
-    `• Приглашать друзей и получать +200 баллов\n` +
-    `${DIVIDER}\n\n` +
-    `📌 Доставка рассчитывается <b>по весу</b> и оплачивается\n` +
-    `перед отправкой со склада в Китае.\n\n` +
-    `Нажмите кнопку ниже 👇`;
-
-  await ctx.replyWithHTML(greeting, {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: "🛍 Открыть Pacific Style", web_app: { url: WEBAPP_URL } }],
-      ],
-    },
-  });
-});
-
-// ---------- /me ----------
-bot.command("me", async (ctx) => {
-  const user = q.getUser.get(ctx.from.id);
-  if (!user) {
-    return ctx.replyWithHTML(
-      `Сначала нажмите /start, чтобы зарегистрироваться.`
-    );
-  }
-  const status = user.is_admin ? "✅ Администратор" : "Клиент";
-  await ctx.replyWithHTML(
-    `👤 <b>Ваш профиль</b>\n\n` +
-      `${DIVIDER}\n` +
-      `<b>Имя:</b> ${user.first_name}\n` +
-      `<b>Username:</b> @${user.username || "—"}\n` +
-      `<b>Телефон:</b> ${user.phone || "не указан"}\n` +
-      `<b>Статус:</b> ${status}\n` +
-      `${DIVIDER}\n\n` +
-      `🎁 <b>Бонусные баллы:</b> ${user.bonus_points}\n\n` +
-      `1 балл = 1 ₽ скидки на комиссию.`
-  );
-});
-
-// ---------- /help ----------
-bot.command("help", async (ctx) => {
-  await ctx.replyWithHTML(
-    `❓ <b>Справка ${BRAND}</b>\n\n` +
-      `${DIVIDER}\n` +
-      `<b>Команды:</b>\n\n` +
-      `/start — главное меню\n` +
-      `/me — ваш профиль и баллы\n` +
-      `/ref — реферальная ссылка\n` +
-      `/help — эта справка\n` +
-      `${DIVIDER}\n\n` +
-      `💬 По всем вопросам: @kuzz767\n` +
-      `📞 Телефон: +7 914 675-57-35`
-  );
-});
-
-// ---------- /ref ----------
-bot.command("ref", async (ctx) => {
-  const me = await bot.telegram.getMe();
-  const link = `https://t.me/${me.username}?start=ref_${ctx.from.id}`;
-  await ctx.replyWithHTML(
-    `🔗 <b>Ваша реферальная ссылка</b>\n\n` +
-      `${DIVIDER}\n` +
-      `<code>${link}</code>\n` +
-      `${DIVIDER}\n\n` +
-      `👥 Приглашайте друзей и получайте:\n\n` +
-      `• <b>+200 баллов</b> за каждого друга,\n` +
-      `  который сделает заказ\n\n` +
-      `🎁 Баллы можно тратить на скидку\n` +
-      `по комиссии ваших заказов.`
-  );
-});
-
-// ============== УВЕДОМЛЕНИЯ ==============
-async function notifyUser(telegramId, text) {
-  try {
-    await bot.telegram.sendMessage(telegramId, text, { parse_mode: "HTML" });
-  } catch (e) {
-    console.error(`Не удалось отправить уведомление ${telegramId}:`, e.message);
-  }
-}
-
-const STATUS_LABELS = {
-  created: "🛒 Оформлен",
-  cn_warehouse: "📦 На складе в Китае",
-  in_transit: "✈️ В пути в ваш город",
-  delivered: "🚚 Доставлен",
-  closed: "✅ Завершён",
-};
-
-// ============== EXPRESS ==============
-const app = express();
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-function authMiddleware(req, res, next) {
-  try {
-    const initData = req.headers["x-telegram-init-data"];
-    const tgUser = verifyInitData(initData);
-    const user = q.getUser.get(tgUser.id);
-    if (!user)
-      return res.status(404).json({ error: "Пользователь не найден. Нажмите /start в боте." });
-    req.user = user;
-    next();
-  } catch (e) {
-    res.status(401).json({ error: e.message });
-  }
-}
-
-function adminMiddleware(req, res, next) {
-  if (!req.user?.is_admin) return res.status(403).json({ error: "Только для администраторов" });
-  next();
-}
-
-// ---------- ОБЩИЕ ----------
-
-app.get("/api/rate", (req, res) => {
-  res.json({ rate: getCnyRate() });
-});
-
-app.get("/api/me", authMiddleware, (req, res) => {
-  const u = req.user;
-  res.json({
-    id: u.id,
-    telegram_id: u.telegram_id,
-    first_name: u.first_name,
-    username: u.username,
-    phone: u.phone,
-    bonus: u.bonus_points,
-    is_admin: !!u.is_admin,
-  });
-});
-
-app.get("/api/orders", authMiddleware, (req, res) => {
-  const orders = q.userOrders.all(req.user.id);
-  const withProducts = orders.map((o) => ({
-    ...o,
-    products: q.orderProducts.all(o.id),
-  }));
-  res.json(withProducts);
-});
-
-app.get("/api/order/:id", authMiddleware, (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
-  const order = q.orderById.get(orderId);
-  if (!order) return res.status(404).json({ error: "Заказ не найден" });
-  if (order.user_id !== req.user.id && !req.user.is_admin) {
-    return res.status(403).json({ error: "Доступ запрещён" });
-  }
-  const products = q.orderProducts.all(orderId);
-  res.json({ ...order, products });
-});
-
-app.get("/api/bonus", authMiddleware, (req, res) => {
-  res.json({
-    points: req.user.bonus_points,
-    log: q.bonusLog.all(req.user.id),
-  });
-});
-
-// ---------- АДМИН ----------
-
-app.get("/api/admin/users", authMiddleware, adminMiddleware, (req, res) => {
-  res.json(q.listUsers.all());
-});
-
-app.get("/api/admin/orders", authMiddleware, adminMiddleware, (req, res) => {
-  const orders = q.listOrders.all();
-  const withProducts = orders.map((o) => ({
-    ...o,
-    products: q.orderProducts.all(o.id),
-  }));
-  res.json(withProducts);
-});
-
-app.post("/api/admin/rate", authMiddleware, adminMiddleware, (req, res) => {
-  const { rate } = req.body;
-  if (!rate || isNaN(rate)) return res.status(400).json({ error: "Неверный курс" });
-  q.setRate.run(String(rate));
-  res.json({ ok: true });
-});
-
-app.post("/api/admin/award", authMiddleware, adminMiddleware, async (req, res) => {
-  const { user_id, amount, reason } = req.body;
-  if (!user_id || !amount) return res.status(400).json({ error: "Не хватает данных" });
-
-  const user = q.getUserById.get(user_id);
-  if (!user) return res.status(404).json({ error: "Пользователь не найден" });
-
-  q.addBonus.run(amount, user_id);
-  q.logBonus.run(user_id, amount, reason || "manual", req.user.id);
-
-  await notifyUser(
-    user.telegram_id,
-    `🎁 <b>Вам начислены бонусные баллы!</b>\n\n` +
-      `${DIVIDER}\n` +
-      `<b>Начислено:</b> +${amount} баллов\n` +
-      `<b>Причина:</b> ${reason || "начисление"}\n` +
-      `${DIVIDER}\n\n` +
-      `Спасибо, что выбираете ${BRAND} 💙`
-  );
-
-  res.json({ ok: true });
-});
-
-app.post("/api/admin/set_admin", authMiddleware, adminMiddleware, async (req, res) => {
-  const { user_id, is_admin } = req.body;
-  if (!user_id) return res.status(400).json({ error: "Не указан user_id" });
-
-  const target = q.getUserById.get(user_id);
-  if (!target) return res.status(404).json({ error: "Пользователь не найден" });
-
-  q.setAdmin.run(is_admin ? 1 : 0, user_id);
-
-  await notifyUser(
-    target.telegram_id,
-    is_admin
-      ? `🛡 <b>Вам выданы права администратора</b>\n\nТеперь вам доступна админ-панель в приложении.`
-      : `ℹ️ Ваши права администратора сняты.`
-  );
-
-  res.json({ ok: true });
-});
-
-app.post("/api/admin/create_order", authMiddleware, adminMiddleware, async (req, res) => {
-  const { user_id, products, commission, delivery } = req.body;
-  if (!user_id || !Array.isArray(products) || !products.length) {
-    return res.status(400).json({ error: "Не хватает данных" });
-  }
-
-  const user = q.getUserById.get(user_id);
-  if (!user) return res.status(404).json({ error: "Пользователь не найден" });
-
-  const rate = getCnyRate();
-  const comm = commission != null ? commission : COMMISSION_PRICE;
-  const deliv = delivery != null ? delivery : DELIVERY_PRICE;
-  const productsSum = products.reduce((s, p) => s + (p.price_cny || 0) * (p.quantity || 1), 0);
-  const totalRub = productsSum * rate + comm + deliv;
-
-  const info = q.createOrder.run(user_id, comm, deliv, rate, totalRub);
-  const orderId = info.lastInsertRowid;
-
-  for (const p of products) {
-    q.createProduct.run(
-      orderId,
-      p.title || "",
-      p.url || "",
-      p.photo_url || "",
-      p.price_cny || 0,
-      p.quantity || 1
-    );
-  }
-
-  await notifyUser(
-    user.telegram_id,
-    `🛒 <b>Ваш заказ №${orderId} оформлен!</b>\n\n` +
-      `${DIVIDER}\n` +
-      `<b>Товаров:</b> ${products.length}\n` +
-      `<b>Сумма товаров:</b> ${Math.round(productsSum * rate)} ₽\n` +
-      `<b>Комиссия:</b> ${Math.round(comm)} ₽\n` +
-      `<b>Доставка (предв.):</b> ${Math.round(deliv)} ₽\n` +
-      `${DIVIDER}\n` +
-      `<b>Итого:</b> ${Math.round(totalRub)} ₽\n\n` +
-      `📌 Стоимость доставки указана предварительно и будет уточнена после взвешивания на складе в Китае.\n\n` +
-      `Отследить статус заказа можно в приложении.`
-  );
-
-  console.log(`📦 Создан заказ №${orderId} для ${user.first_name}`);
-  res.json({ ok: true, order_id: orderId, total_rub: totalRub });
-});
-
-app.post("/api/admin/order/:id/delivery", authMiddleware, adminMiddleware, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
-  const { delivery } = req.body;
-  if (delivery == null || isNaN(delivery) || delivery < 0) {
-    return res.status(400).json({ error: "Неверная стоимость доставки" });
-  }
-
-  const order = q.orderById.get(orderId);
-  if (!order) return res.status(404).json({ error: "Заказ не найден" });
-
-  const products = q.orderProducts.all(orderId);
-  const productsSum = products.reduce((s, p) => s + p.price_cny * p.quantity, 0);
-  const totalRub = productsSum * order.cny_rate + order.commission + delivery;
-
-  q.setDelivery.run(delivery, totalRub, orderId);
-
-  const user = q.getUserById.get(order.user_id);
-  if (user) {
-    await notifyUser(
-      user.telegram_id,
-      `📦 <b>Заказ №${orderId} — обновление</b>\n\n` +
-        `${DIVIDER}\n` +
-        `<b>Стоимость доставки уточнена:</b>\n` +
-        `${Math.round(delivery)} ₽\n\n` +
-        `<b>Итого к оплате:</b> ${Math.round(totalRub)} ₽\n` +
-        `${DIVIDER}\n\n` +
-        `Проверьте детали в приложении.`
-    );
-  }
-
-  res.json({ ok: true, total_rub: totalRub });
-});
-
-app.post("/api/admin/order/:id/status", authMiddleware, adminMiddleware, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
-  const { status } = req.body;
-
-  if (!STATUS_LABELS[status]) return res.status(400).json({ error: "Неверный статус" });
-
-  const order = q.orderById.get(orderId);
-  if (!order) return res.status(404).json({ error: "Заказ не найден" });
-
-  const closedAt = status === "closed" ? new Date().toISOString() : null;
-  q.setStatus.run(status, closedAt, orderId);
-
-  const user = q.getUserById.get(order.user_id);
-  if (user) {
-    let extra = "";
-
-    if (status === "cn_warehouse") {
-      extra =
-        `\n\n💰 <b>Что дальше:</b>\n` +
-        `Товар прибыл на склад в Китае.\n` +
-        `Теперь необходимо оплатить доставку.\n\n` +
-        `Точная стоимость доставки будет указана в вашем заказе после взвешивания.`;
-    } else if (status === "in_transit") {
-      extra = `\n\n🚚 Товар отправлен из Китая в ваш город.`;
-    } else if (status === "delivered") {
-      extra = `\n\n✅ Товар доставлен. Спасибо, что выбрали ${BRAND}!`;
-    } else if (status === "closed") {
-      extra = `\n\n🎁 Заказ закрыт. Начислено +50 баллов!`;
-    }
-
-    await notifyUser(
-      user.telegram_id,
-      `📦 <b>Заказ №${orderId}</b>\n\n` +
-        `${DIVIDER}\n` +
-        `<b>Новый статус:</b>\n${STATUS_LABELS[status]}\n` +
-        `${DIVIDER}` +
-        extra
-    );
-  }
-
-  console.log(`📦 Заказ №${orderId}: ${status}`);
-  res.json({ ok: true });
-});
-
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString() });
-});
-
-// ============== ЗАПУСК ==============
-const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🌐 Сервер: http://0.0.0.0:${PORT}`);
-  console.log(`🤖 Mini App URL: ${WEBAPP_URL}`);
-  console.log(`✅ Pacific Style готов к работе`);
-});
-
-bot
-  .launch()
-  .then(() => console.log("🤖 Бот запущен"))
-  .catch((e) => console.error("Ошибка запуска бота:", e));
-
-// Корректное завершение
-async function shutdown(signal) {
-  console.log(`\n${signal} получен, завершение...`);
-  try { bot.stop(signal); } catch (e) {}
-  server.close(() => {
-    console.log("Сервер остановлен");
-    process.exit(0);
-  });
-  setTimeout(() => process.exit(0), 5000);
-}
-
-process.once("SIGINT", () => shutdown("SIGINT"));
-process.once("SIGTERM", () => shutdown("SIGTERM"));
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pacific Style — Доставка из Китая, Запада и США</title>
+    <meta name="description" content="Рассчитайте стоимость товара из Китая. Доставка 599₽/кг, оплачивается перед отправкой со склада. Заказы из США и стран Запада по договорённости.">
+
+    <link rel="icon" type="image/jpeg" href="logo.jpg">
+    <link rel="shortcut icon" type="image/jpeg" href="logo.jpg">
+    <link rel="apple-touch-icon" href="logo.jpg">
+    <meta name="theme-color" content="#050508">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Pacific Style — Доставка из Китая, Запада и США">
+    <meta property="og:description" content="Рассчитайте стоимость товара из Китая. Доставка 599₽/кг, оплачивается перед отправкой со склада. Заказы из США и стран Запада по договорённости.">
+    <meta property="og:image" content="logo.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="logo.jpg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --black: #050508;
+            --black-soft: #0a0a10;
+            --black-card: #0e0e16;
+            --white: #ffffff;
+            --white-muted: rgba(255,255,255,0.6);
+            --white-dim: rgba(255,255,255,0.35);
+            --blue: #3b82f6;
+            --blue-bright: #60a5fa;
+            --blue-glow: rgba(59,130,246,0.3);
+            --blue-subtle: rgba(59,130,246,0.08);
+            --border: rgba(255,255,255,0.07);
+            --border-blue: rgba(59,130,246,0.25);
+            --yellow: #fbbf24;
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-logo: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --radius: 16px;
+            --radius-lg: 24px;
+            --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font);
+            background: var(--black);
+            color: var(--white);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+
+        .bg-grid {
+            position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none; z-index: 0;
+        }
+        .bg-glow {
+            position: fixed; border-radius: 50%;
+            filter: blur(120px); pointer-events: none; z-index: 0;
+        }
+        .bg-glow--1 {
+            width: 500px; height: 500px;
+            background: rgba(59,130,246,0.08);
+            top: -200px; right: -100px;
+        }
+        .bg-glow--2 {
+            width: 400px; height: 400px;
+            background: rgba(59,130,246,0.05);
+            bottom: -150px; left: -100px;
+        }
+
+        .nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            padding: 16px 0; transition: var(--transition);
+            backdrop-filter: blur(20px);
+            background: rgba(5,5,8,0.8);
+            border-bottom: 1px solid transparent;
+        }
+        .nav--scrolled { border-bottom-color: var(--border); }
+        .nav__inner {
+            max-width: 1140px; margin: 0 auto; padding: 0 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
+        .nav__logo {
+            font-family: var(--font-logo);
+            font-size: 1.15rem;
+            font-weight: 900;
+            color: var(--white);
+            text-decoration: none;
+            display: flex; align-items: center;
+            gap: 8px;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+        }
+        .nav__logo-icon { color: var(--blue); font-size: 1.4rem; font-family: var(--font); }
+        .nav__logo-accent { color: var(--blue); }
+        .nav__links { display: flex; gap: 28px; }
+        .nav__link {
+            color: var(--white-muted); text-decoration: none;
+            font-size: 0.9rem; font-weight: 500; transition: var(--transition);
+        }
+        .nav__link:hover { color: var(--white); }
+        .nav__link.active { color: var(--blue-bright); }
+        .nav__cta {
+            padding: 10px 20px; background: var(--blue); color: var(--white);
+            text-decoration: none; border-radius: 100px;
+            font-size: 0.85rem; font-weight: 600; transition: var(--transition);
+        }
+        .nav__cta:hover { background: var(--blue-bright); box-shadow: 0 0 30px var(--blue-glow); }
+
+        .hero {
+            position: relative; z-index: 1;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 60px; align-items: center;
+            max-width: 1140px; margin: 0 auto;
+            padding: 160px 24px 100px; min-height: 100vh;
+        }
+        .hero__badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 8px 16px; background: var(--blue-subtle);
+            border: 1px solid var(--border-blue); border-radius: 100px;
+            font-size: 0.8rem; font-weight: 500; color: var(--blue-bright);
+            margin-bottom: 24px; animation: fadeUp 0.6s ease both;
+        }
+        .hero__badge-dot {
+            width: 6px; height: 6px; background: var(--blue);
+            border-radius: 50%; animation: pulse 2s ease infinite;
+        }
+        @keyframes pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.3); }
+        }
+        .hero__title {
+            font-size: clamp(2.2rem, 4.5vw, 3.5rem); font-weight: 800;
+            line-height: 1.1; letter-spacing: -0.03em;
+            margin-bottom: 24px; animation: fadeUp 0.6s ease 0.1s both;
+        }
+        .hero__title-accent {
+            background: linear-gradient(135deg, var(--blue) 0%, var(--blue-bright) 50%, #a78bfa 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero__subtitle {
+            font-size: 1.05rem; color: var(--white-muted);
+            max-width: 480px; margin-bottom: 36px;
+            animation: fadeUp 0.6s ease 0.2s both;
+        }
+        .hero__actions {
+            display: flex; gap: 16px; margin-bottom: 48px;
+            animation: fadeUp 0.6s ease 0.3s both; flex-wrap: wrap;
+        }
+        .hero__stats {
+            display: flex; align-items: center; gap: 24px;
+            animation: fadeUp 0.6s ease 0.4s both;
+        }
+        .hero__stat { display: flex; flex-direction: column; }
+        .hero__stat-value { font-size: 1.5rem; font-weight: 700; color: var(--white); }
+        .hero__stat-label {
+            font-size: 0.8rem; color: var(--white-dim);
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .hero__stat-divider { width: 1px; height: 36px; background: var(--border); }
+        .hero__visual { animation: fadeUp 0.8s ease 0.3s both; }
+        .hero__image-wrapper {
+            position: relative; border-radius: var(--radius-lg);
+            overflow: hidden; border: 1px solid var(--border);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+        }
+        .hero__image {
+            width: 100%; height: 480px; object-fit: cover;
+            display: block; transition: transform 0.6s ease;
+        }
+        .hero__image-wrapper:hover .hero__image { transform: scale(1.03); }
+        .hero__image-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 14px 28px; border-radius: 100px;
+            font-size: 0.9rem; font-weight: 600;
+            text-decoration: none; cursor: pointer; border: none;
+            transition: var(--transition); font-family: var(--font);
+        }
+        .btn--primary {
+            background: var(--blue); color: var(--white);
+            box-shadow: 0 0 0 0 var(--blue-glow);
+        }
+        .btn--primary:hover {
+            background: var(--blue-bright);
+            box-shadow: 0 0 40px var(--blue-glow);
+            transform: translateY(-2px);
+        }
+        .btn--ghost {
+            background: transparent; color: var(--white);
+            border: 1px solid var(--border);
+        }
+        .btn--ghost:hover {
+            border-color: var(--border-blue);
+            background: var(--blue-subtle);
+        }
+        .btn--full { width: 100%; }
+
+        .section-header { text-align: center; margin-bottom: 60px; }
+        .section-tag {
+            display: inline-block; font-size: 0.75rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.1em;
+            color: var(--blue); margin-bottom: 12px;
+        }
+        .section-title {
+            font-size: clamp(1.8rem, 3.5vw, 2.5rem); font-weight: 700;
+            letter-spacing: -0.02em; line-height: 1.2;
+        }
+        .section-title--left { text-align: left; }
+        .section-subtitle { color: var(--white-muted); margin-top: 12px; }
+
+        .calculator-section { position: relative; z-index: 1; padding: 100px 0; }
+        .calculator { max-width: 520px; margin: 0 auto; }
+        .calculator__card {
+            background: var(--black-card); border: 1px solid var(--border);
+            border-radius: var(--radius-lg); padding: 40px;
+            position: relative; overflow: hidden;
+        }
+        .calculator__card::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--blue), transparent);
+            opacity: 0.5;
+        }
+        .calculator__field { margin-bottom: 20px; }
+        .calculator__label {
+            display: block; font-size: 0.85rem; font-weight: 500;
+            color: var(--white-muted); margin-bottom: 10px;
+        }
+        .calculator__input-wrapper { position: relative; }
+        .calculator__input {
+            width: 100%; padding: 16px 50px 16px 18px;
+            background: var(--black-soft); border: 1px solid var(--border);
+            border-radius: var(--radius); color: var(--white);
+            font-size: 1.1rem; font-weight: 600; font-family: var(--font);
+            outline: none; transition: var(--transition);
+        }
+        .calculator__input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px var(--blue-subtle);
+        }
+        .calculator__input::placeholder { color: var(--white-dim); font-weight: 400; }
+        .calculator__unit {
+            position: absolute; right: 18px; top: 50%;
+            transform: translateY(-50%); color: var(--white-dim);
+            font-size: 0.9rem; pointer-events: none;
+        }
+        .calculator__rate {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 18px; background: var(--blue-subtle);
+            border: 1px solid var(--border-blue); border-radius: var(--radius);
+            margin-bottom: 24px; font-size: 0.85rem;
+        }
+        .calculator__rate-label { color: var(--white-muted); }
+        .calculator__rate-value { color: var(--blue-bright); font-weight: 600; }
+        .calculator__result {
+            margin-top: 28px; padding-top: 28px;
+            border-top: 1px solid var(--border);
+            opacity: 0; transform: translateY(10px);
+            transition: var(--transition);
+        }
+        .calculator__result.visible { opacity: 1; transform: translateY(0); }
+        .calculator__result-row {
+            display: flex; justify-content: space-between;
+            font-size: 0.9rem; color: var(--white-muted); margin-bottom: 10px;
+        }
+        .calculator__result-total {
+            display: flex; justify-content: space-between;
+            font-size: 1.3rem; font-weight: 700; color: var(--white);
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .calculator__result-total span:last-child { color: var(--blue-bright); }
+        .calculator__note {
+            font-size: 0.75rem; color: var(--white-dim);
+            margin-top: 20px; line-height: 1.5;
+        }
+        .calculator__warn {
+            display: flex; gap: 10px;
+            font-size: 0.8rem; line-height: 1.55;
+            color: rgba(251,191,36,0.95);
+            background: rgba(251,191,36,0.07);
+            border: 1px solid rgba(251,191,36,0.22);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin-top: 20px;
+        }
+        .calculator__warn b { color: var(--yellow); }
+
+        .how { position: relative; z-index: 1; padding: 100px 0; }
+        .how__steps {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+        }
+        .how__step {
+            padding: 32px 24px; background: var(--black-card);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            transition: var(--transition);
+        }
+        .how__step:hover {
+            border-color: var(--border-blue); transform: translateY(-4px);
+        }
+        .how__step-number {
+            display: block; font-size: 0.75rem; font-weight: 700;
+            color: var(--blue); letter-spacing: 0.1em; margin-bottom: 16px;
+        }
+        .how__step-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 8px; }
+        .how__step-desc { font-size: 0.85rem; color: var(--white-muted); line-height: 1.5; }
+
+        .usa { position: relative; z-index: 1; padding: 100px 0; }
+        .usa__grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 60px; align-items: center;
+        }
+        .usa__desc { color: var(--white-muted); margin: 16px 0 28px; max-width: 460px; }
+        .usa__list {
+            list-style: none; display: flex; flex-direction: column;
+            gap: 14px; margin-bottom: 32px;
+        }
+        .usa__list-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            font-size: 0.95rem; color: var(--white-muted);
+        }
+        .usa__list-icon {
+            flex-shrink: 0; width: 22px; height: 22px;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--blue-subtle); border: 1px solid var(--border-blue);
+            border-radius: 50%; color: var(--blue-bright);
+            font-size: 0.7rem; font-weight: 700; margin-top: 2px;
+        }
+        .usa__visual { position: relative; animation: fadeUp 0.8s ease both; }
+        .usa__info-card {
+            padding: 36px;
+            background: var(--black-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            position: relative;
+            overflow: hidden;
+        }
+        .usa__info-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--blue), var(--blue-bright), #a78bfa);
+        }
+        .usa__info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .usa__info-row:last-of-type { border-bottom: none; }
+        .usa__info-label { color: var(--white-muted); }
+        .usa__info-value {
+            color: var(--white);
+            font-weight: 600;
+            text-align: right;
+        }
+        .usa__info-total {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--white);
+            margin-top: 12px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+        .usa__info-total span:last-child { color: var(--blue-bright); }
+
+        .platforms { position: relative; z-index: 1; padding: 100px 0; }
+        .platforms__grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+        }
+        .platform-card {
+            padding: 28px 24px; background: var(--black-card);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            transition: var(--transition); text-decoration: none;
+            color: var(--white); display: block;
+        }
+        .platform-card:hover {
+            border-color: var(--border-blue); transform: translateY(-4px);
+            background: var(--blue-subtle);
+        }
+        .platform-card__icon { font-size: 1.8rem; margin-bottom: 16px; display: block; color: var(--blue); }
+        .platform-card__title { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+        .platform-card__desc {
+            font-size: 0.85rem; color: var(--white-muted);
+            line-height: 1.5; margin-bottom: 16px;
+        }
+        .platform-card__link { font-size: 0.85rem; color: var(--blue-bright); font-weight: 600; }
+
+        .contacts { position: relative; z-index: 1; padding: 100px 0; }
+        .contacts__grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 60px; align-items: start;
+        }
+        .contacts__desc { color: var(--white-muted); margin: 16px 0 36px; max-width: 400px; }
+        .contacts__list { display: flex; flex-direction: column; gap: 16px; }
+        .contacts__item {
+            display: flex; align-items: center; gap: 16px;
+            padding: 20px 24px; background: var(--black-card);
+            border: 1px solid var(--border); border-radius: var(--radius);
+            text-decoration: none; color: var(--white); transition: var(--transition);
+        }
+        .contacts__item:hover {
+            border-color: var(--border-blue); background: var(--blue-subtle);
+        }
+        .contacts__item-icon {
+            font-size: 1.5rem; width: 48px; height: 48px;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--black-soft); border-radius: 12px;
+            color: var(--blue); flex-shrink: 0;
+        }
+        .contacts__item-label {
+            display: block; font-size: 0.75rem; color: var(--white-dim);
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .contacts__item-value { display: block; font-size: 1.05rem; font-weight: 600; }
+        .contacts__card {
+            padding: 40px; background: var(--black-card);
+            border: 1px solid var(--border); border-radius: var(--radius-lg);
+            position: relative; overflow: hidden;
+        }
+        .contacts__card::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, var(--blue), var(--blue-bright), #a78bfa);
+        }
+        .contacts__card-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
+        .contacts__card-desc { font-size: 0.9rem; color: var(--white-muted); margin-bottom: 28px; }
+
+        .footer {
+            position: relative; z-index: 1;
+            padding: 32px 0; border-top: 1px solid var(--border);
+        }
+        .footer__inner { display: flex; align-items: center; justify-content: space-between; }
+
+        .footer__logo {
+            font-family: var(--font-logo);
+            font-size: 1rem;
+            font-weight: 900;
+            letter-spacing: -0.01em;
+            text-transform: uppercase;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .footer__copy { font-size: 0.8rem; color: var(--white-dim); }
+
+        @media (max-width: 968px) {
+            .hero { grid-template-columns: 1fr; padding-top: 120px; text-align: center; min-height: auto; }
+            .hero__subtitle { margin-left: auto; margin-right: auto; }
+            .hero__actions { justify-content: center; }
+            .hero__stats { justify-content: center; }
+            .hero__visual { order: -1; }
+            .hero__image { height: 300px; }
+            .how__steps { grid-template-columns: repeat(2, 1fr); }
+            .usa__grid { grid-template-columns: 1fr; gap: 40px; }
+            .usa__visual { order: -1; }
+            .platforms__grid { grid-template-columns: repeat(2, 1fr); }
+            .contacts__grid { grid-template-columns: 1fr; }
+            .nav__links { display: none; }
+        }
+        @media (max-width: 568px) {
+            .hero__actions { flex-direction: column; width: 100%; }
+            .hero__actions .btn { width: 100%; }
+            .how__steps { grid-template-columns: 1fr; }
+            .calculator__card { padding: 24px; }
+            .hero__stats { flex-direction: column; gap: 16px; }
+            .hero__stat-divider { width: 40px; height: 1px; }
+            .footer__inner { flex-direction: column; gap: 12px; text-align: center; }
+            .platforms__grid { grid-template-columns: 1fr; }
+            .usa__info-card { padding: 24px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+            html { scroll-behavior: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow--1"></div>
+    <div class="bg-glow bg-glow--2"></div>
+
+    <nav class="nav" id="nav">
+        <div class="nav__inner">
+            <a href="index.html" class="nav__logo">
+                <span class="nav__logo-icon">◈</span>
+                Pacific <span class="nav__logo-accent">Style</span>
+            </a>
+            <div class="nav__links">
+                <a href="#calculator" class="nav__link">Калькулятор</a>
+                <a href="#how" class="nav__link">Как это работает</a>
+                <a href="#usa" class="nav__link">Из США</a>
+                <a href="instructions.html" class="nav__link">Инструкции</a>
+                <a href="#contacts" class="nav__link">Контакты</a>
+            </div>
+            <a href="tel:+79146755735" class="nav__cta">Связаться</a>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="hero__content">
+            <div class="hero__badge">
+                <span class="hero__badge-dot"></span>
+                Работаем с Китаем, Западом и США напрямую
+            </div>
+            <h1 class="hero__title">
+                Считайте стоимость<br>
+                <span class="hero__title-accent">товаров из Китая</span>
+            </h1>
+            <p class="hero__subtitle">
+                Введите цену в юанях — получите итог в рублях с учётом курса,
+                доставки и комиссии. Без скрытых платежей.
+            </p>
+            <div class="hero__actions">
+                <a href="#calculator" class="btn btn--primary">Открыть калькулятор</a>
+                <a href="instructions.html" class="btn btn--ghost">Инструкции по площадкам</a>
+            </div>
+            <div class="hero__stats">
+                <div class="hero__stat">
+                    <span class="hero__stat-value">599 ₽</span>
+                    <span class="hero__stat-label">доставка за кг</span>
+                </div>
+                <div class="hero__stat-divider"></div>
+                <div class="hero__stat">
+                    <span class="hero__stat-value">5–8</span>
+                    <span class="hero__stat-label">дней</span>
+                </div>
+                <div class="hero__stat-divider"></div>
+                <div class="hero__stat">
+                    <span class="hero__stat-value">550 ₽</span>
+                    <span class="hero__stat-label">комиссия</span>
+                </div>
+            </div>
+        </div>
+        <div class="hero__visual">
+            <div class="hero__image-wrapper">
+                <img src="hero.jpg" alt="Логистический центр в Китае" class="hero__image" loading="eager">
+                <div class="hero__image-overlay"></div>
+            </div>
+        </div>
+    </header>
+
+    <section class="calculator-section" id="calculator">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Калькулятор</span>
+                <h2 class="section-title">Узнайте итоговую стоимость</h2>
+                <p class="section-subtitle">Введите цену товара в юанях — калькулятор посчитает всё автоматически</p>
+            </div>
+
+            <div class="calculator">
+                <div class="calculator__card">
+                    <div class="calculator__field">
+                        <label for="priceCny" class="calculator__label">Цена товара в юанях</label>
+                        <div class="calculator__input-wrapper">
+                            <input type="number" id="priceCny" class="calculator__input" placeholder="Например: 129.90" min="0.01" step="0.01" value="100">
+                            <span class="calculator__unit">¥</span>
+                        </div>
+                    </div>
+
+                    <div class="calculator__rate">
+                        <span class="calculator__rate-label">Курс юаня:</span>
+                        <span class="calculator__rate-value" id="rateValue">загрузка…</span>
+                    </div>
+
+                    <button class="btn btn--primary btn--full" id="calcBtn">Рассчитать</button>
+
+                    <div class="calculator__result" id="result">
+                        <div class="calculator__result-row">
+                            <span>Цена товара</span>
+                            <span id="resultPriceRub">—</span>
+                        </div>
+                        <div class="calculator__result-row">
+                            <span>Доставка (за кг)</span>
+                            <span id="resultDelivery">599 ₽</span>
+                        </div>
+                        <div class="calculator__result-row">
+                            <span>Комиссия</span>
+                            <span id="resultCommission">550 ₽</span>
+                        </div>
+                        <div class="calculator__result-total">
+                            <span>Итого:</span>
+                            <span id="resultTotal">—</span>
+                        </div>
+                    </div>
+
+                    <div class="calculator__warn">
+                        <span>⚠️</span>
+                        <div>
+                            <b>О доставке.</b><br>
+                            Стоимость доставки рассчитывается по весу и оплачивается отдельно — <b>перед отправлением со склада в Китае</b>. Итоговая сумма может отличаться от предварительной (зависит от фактического веса посылки).
+                        </div>
+                    </div>
+
+                    <p class="calculator__note">
+                        * Доставка указана за 1 кг. Итоговая стоимость зависит от фактического веса
+                        и объёма груза. Точную цену уточняйте у менеджера.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="how" id="how">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Процесс</span>
+                <h2 class="section-title">Как это работает</h2>
+            </div>
+
+            <div class="how__steps">
+                <div class="how__step">
+                    <span class="how__step-number">01</span>
+                    <h3 class="how__step-title">Заявка</h3>
+                    <p class="how__step-desc">Свяжитесь с нами, обсудим товар и сроки</p>
+                </div>
+                <div class="how__step">
+                    <span class="how__step-number">02</span>
+                    <h3 class="how__step-title">Выкуп</h3>
+                    <p class="how__step-desc">Выкупаем товар у поставщика в Китае</p>
+                </div>
+                <div class="how__step">
+                    <span class="how__step-number">03</span>
+                    <h3 class="how__step-title">Склад в Китае</h3>
+                    <p class="how__step-desc">Приёмка, консолидация и взвешивание груза</p>
+                </div>
+                <div class="how__step">
+                    <span class="how__step-number">04</span>
+                    <h3 class="how__step-title">Доставка</h3>
+                    <p class="how__step-desc">5–8 дней до вашего города в России (срок зависит от вашего города)</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="usa" id="usa">
+        <div class="container">
+            <div class="usa__grid">
+                <div class="usa__content">
+                    <span class="section-tag">Из США и Запада</span>
+                    <h2 class="section-title section-title--left">Заказы из Америки</h2>
+                    <p class="usa__desc">
+                        Также можем привезти товары из США и стран Запада — одежда,
+                        брендовые вещи, косметика и многое другое. Условия и сроки
+                        обсуждаются индивидуально.
+                    </p>
+
+                    <ul class="usa__list">
+                        <li class="usa__list-item">
+                            <span class="usa__list-icon">✓</span>
+                            <span>Условия и стоимость — по договорённости</span>
+                        </li>
+                        <li class="usa__list-item">
+                            <span class="usa__list-icon">✓</span>
+                            <span>Сроки зависят от категории товара и штата</span>
+                        </li>
+                        <li class="usa__list-item">
+                            <span class="usa__list-icon">✓</span>
+                            <span>Работаем с оригинальной продукцией</span>
+                        </li>
+                        <li class="usa__list-item">
+                            <span class="usa__list-icon">✓</span>
+                            <span>Рассчитаем стоимость индивидуально под ваш заказ</span>
+                        </li>
+                    </ul>
+
+                    <a href="https://t.me/kuzz767" target="_blank" class="btn btn--primary">
+                        Обсудить заказ из США
+                    </a>
+                </div>
+
+                <div class="usa__visual">
+                    <div class="usa__info-card">
+                        <div class="usa__info-row">
+                            <span class="usa__info-label">Условия</span>
+                            <span class="usa__info-value">По договорённости</span>
+                        </div>
+                        <div class="usa__info-row">
+                            <span class="usa__info-label">Сроки</span>
+                            <span class="usa__info-value">Индивидуально</span>
+                        </div>
+                        <div class="usa__info-row">
+                            <span class="usa__info-label">Категории</span>
+                            <span class="usa__info-value">Одежда, косметика, бренды</span>
+                        </div>
+                        <div class="usa__info-row">
+                            <span class="usa__info-label">Продукция</span>
+                            <span class="usa__info-value">Оригинал</span>
+                        </div>
+                        <div class="usa__info-row">
+                            <span class="usa__info-label">Маршрут</span>
+                            <span class="usa__info-value">США — Россия</span>
+                        </div>
+                        <div class="usa__info-total">
+                            <span>Расчёт</span>
+                            <span>Индивидуально</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="platforms" id="platforms">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Площадки</span>
+                <h2 class="section-title">С какими площадками работаем</h2>
+                <p class="section-subtitle">Пошаговые инструкции — на отдельной странице</p>
+            </div>
+
+            <div class="platforms__grid">
+                <a href="instructions.html#poizon" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">Poizon / Dewu</h3>
+                    <p class="platform-card__desc">Кроссовки, одежда, брендовые вещи из Китая</p>
+                    <span class="platform-card__link">Инструкция →</span>
+                </a>
+                <a href="instructions.html#taobao" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">Taobao</h3>
+                    <p class="platform-card__desc">Миллионы товаров от китайских производителей</p>
+                    <span class="platform-card__link">Инструкция →</span>
+                </a>
+                <a href="instructions.html#1688" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">1688</h3>
+                    <p class="platform-card__desc">Оптовая площадка для крупных закупок</p>
+                    <span class="platform-card__link">Инструкция →</span>
+                </a>
+                <a href="instructions.html#pinduoduo" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">Pinduoduo</h3>
+                    <p class="platform-card__desc">Дешёвые товары и групповые покупки</p>
+                    <span class="platform-card__link">Инструкция →</span>
+                </a>
+                <a href="instructions.html#95" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">95 (95fenapp)</h3>
+                    <p class="platform-card__desc">Молодёжная площадка, вход через Dewu</p>
+                    <span class="platform-card__link">Инструкция →</span>
+                </a>
+                <a href="instructions.html" class="platform-card">
+                    <span class="platform-card__icon">◈</span>
+                    <h3 class="platform-card__title">Все инструкции</h3>
+                    <p class="platform-card__desc">Пошаговые гайды по всем площадкам</p>
+                    <span class="platform-card__link">Открыть →</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="contacts" id="contacts">
+        <div class="container">
+            <div class="contacts__grid">
+                <div class="contacts__info">
+                    <span class="section-tag">Контакты</span>
+                    <h2 class="section-title section-title--left">Свяжитесь с нами</h2>
+                    <p class="contacts__desc">Ответим на вопросы и рассчитаем индивидуальные условия</p>
+
+                    <div class="contacts__list">
+                        <a href="tel:+79146755735" class="contacts__item">
+                            <span class="contacts__item-icon">◈</span>
+                            <div>
+                                <span class="contacts__item-label">Телефон</span>
+                                <span class="contacts__item-value">+7 914 675-57-35</span>
+                            </div>
+                        </a>
+                        <a href="https://t.me/kuzz767" target="_blank" class="contacts__item">
+                            <span class="contacts__item-icon">◈</span>
+                            <div>
+                                <span class="contacts__item-label">Telegram</span>
+                                <span class="contacts__item-value">@kuzz767</span>
+                            </div>
+                        </a>
+                        <a href="mailto:admin@pacificstyle.ru" class="contacts__item">
+                            <span class="contacts__item-icon">◈</span>
+                            <div>
+                                <span class="contacts__item-label">Email</span>
+                                <span class="contacts__item-value">admin@pacificstyle.ru</span>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="contacts__card">
+                    <h3 class="contacts__card-title">Оставьте заявку</h3>
+                    <p class="contacts__card-desc">Мы свяжемся с вами в течение 15 минут</p>
+                    <a href="https://t.me/kuzz767" target="_blank" class="btn btn--primary btn--full">
+                        Написать в Telegram
+                    </a>
+                    <a href="tel:+79146755735" class="btn btn--ghost btn--full" style="margin-top: 12px;">
+                        Позвонить
+                    </a>
+                    <a href="mailto:admin@pacificstyle.ru" class="btn btn--ghost btn--full" style="margin-top: 12px;">
+                        Написать на почту
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer__inner">
+                <span class="footer__logo">
+                    <span class="nav__logo-icon">◈</span>
+                    Pacific <span class="nav__logo-accent">Style</span>
+                </span>
+                <p class="footer__copy">© 2026 Pacific Style. Доставка из Китая, Запада и США.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const CONFIG = {
+                delivery: 599,
+                commission: 550,
+                locale: 'ru-RU'
+            };
+
+            const DATA_JSON_BASE = 'https://raw.githubusercontent.com/kuzz767/pacificstyle/main/data.json';
+            const REFRESH_INTERVAL = 30000;
+
+            const priceInput = document.getElementById('priceCny');
+            const calcBtn = document.getElementById('calcBtn');
+            const resultBlock = document.getElementById('result');
+            const resultPriceRub = document.getElementById('resultPriceRub');
+            const resultDelivery = document.getElementById('resultDelivery');
+            const resultCommission = document.getElementById('resultCommission');
+            const resultTotal = document.getElementById('resultTotal');
+            const rateValue = document.getElementById('rateValue');
+            const nav = document.getElementById('nav');
+
+            let currentRate = null;
+            let lastRateRaw = null;
+
+            function formatRub(value) {
+                return new Intl.NumberFormat(CONFIG.locale, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(value) + ' ₽';
+            }
+
+            function formatRate(value) {
+                return new Intl.NumberFormat(CONFIG.locale, {
+                    minimumFractionDigits: 4,
+                    maximumFractionDigits: 4
+                }).format(value) + ' ₽/¥';
+            }
+
+            async function fetchDataJson() {
+                try {
+                    const url = DATA_JSON_BASE + '?t=' + Date.now();
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+                    const data = await res.json();
+
+                    if (typeof data.delivery === 'number' && data.delivery > 0) {
+                        CONFIG.delivery = data.delivery;
+                    }
+                    if (typeof data.commission === 'number' && data.commission >= 0) {
+                        CONFIG.commission = data.commission;
+                    }
+
+                    if (typeof data.cny_rate === 'number' && data.cny_rate > 0) {
+                        return data.cny_rate;
+                    }
+
+                    console.warn('data.json: поле cny_rate отсутствует или некорректно');
+                    return null;
+                } catch (e) {
+                    console.warn('Не удалось загрузить data.json:', e);
+                    return null;
+                }
+            }
+
+            function animateTotal(target) {
+                const duration = 700;
+                const start = performance.now();
+                function tick(now) {
+                    const progress = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    resultTotal.textContent = formatRub(target * eased);
+                    if (progress < 1) requestAnimationFrame(tick);
+                    else resultTotal.textContent = formatRub(target);
+                }
+                requestAnimationFrame(tick);
+            }
+
+            function calculate() {
+                const priceCny = parseFloat(priceInput.value);
+                if (isNaN(priceCny) || priceCny <= 0) {
+                    priceInput.focus();
+                    priceInput.style.borderColor = '#ef4444';
+                    setTimeout(() => { priceInput.style.borderColor = ''; }, 1500);
+                    return;
+                }
+
+                if (currentRate === null) {
+                    rateValue.textContent = 'курс недоступен';
+                    return;
+                }
+
+                const priceRub = priceCny * currentRate;
+                const total = priceRub + CONFIG.delivery + CONFIG.commission;
+
+                resultPriceRub.textContent = formatRub(priceRub);
+                resultDelivery.textContent = CONFIG.delivery + ' ₽ (за кг)';
+                resultCommission.textContent = CONFIG.commission + ' ₽';
+
+                resultBlock.classList.remove('visible');
+                void resultBlock.offsetWidth;
+                resultBlock.classList.add('visible');
+
+                animateTotal(total);
+            }
+
+            async function refreshRate() {
+                const newRate = await fetchDataJson();
+
+                if (newRate === null) {
+                    if (currentRate === null) {
+                        rateValue.textContent = 'курс недоступен';
+                    }
+                    return;
+                }
+
+                if (newRate !== lastRateRaw) {
+                    lastRateRaw = newRate;
+                    currentRate = newRate;
+                    rateValue.textContent = formatRate(newRate);
+
+                    if (resultBlock.classList.contains('visible')) {
+                        calculate();
+                    }
+                }
+            }
+
+            calcBtn.addEventListener('click', calculate);
+            priceInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') calculate(); });
+            priceInput.addEventListener('input', () => {
+                if (resultBlock.classList.contains('visible')) calculate();
+            });
+
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 20) nav.classList.add('nav--scrolled');
+                else nav.classList.remove('nav--scrolled');
+            }, { passive: true });
+
+            (async function init() {
+                await refreshRate();
+                if (priceInput.value) calculate();
+            })();
+
+            setInterval(refreshRate, REFRESH_INTERVAL);
+        })();
+    </script>
+</body>
+</html>
