@@ -1,996 +1,915 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pacific Style — Доставка из Китая, Запада и США</title>
-    <meta name="description" content="Рассчитайте стоимость товара из Китая. Доставка 599₽/кг, оплачивается перед отправкой со склада. Заказы из США и стран Запада по договорённости.">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Pacific Style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-    <link rel="icon" type="image/jpeg" href="logo.jpg">
-    <link rel="shortcut icon" type="image/jpeg" href="logo.jpg">
-    <link rel="apple-touch-icon" href="logo.jpg">
-    <meta name="theme-color" content="#050508">
+  :root {
+    --black: #050508;
+    --black-soft: #0a0a10;
+    --black-card: #0d0d14;
+    --white: #ffffff;
+    --white-muted: rgba(255,255,255,0.60);
+    --white-dim: rgba(255,255,255,0.36);
+    --blue: #3b82f6;
+    --blue-bright: #60a5fa;
+    --blue-subtle: rgba(59,130,246,0.10);
+    --border: rgba(255,255,255,0.09);
+    --red: #ef4444;
+    --green: #10b981;
+    --yellow: #fbbf24;
+    --radius: 12px;
+    --transition: 0.15s ease;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
 
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Pacific Style — Доставка из Китая, Запада и США">
-    <meta property="og:description" content="Рассчитайте стоимость товара из Китая. Доставка 599₽/кг, оплачивается перед отправкой со склада. Заказы из США и стран Запада по договорённости.">
-    <meta property="og:image" content="logo.jpg">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="logo.jpg">
+  body {
+    font-family: var(--font);
+    background: var(--black);
+    color: var(--white);
+    min-height: 100vh;
+    padding: 12px 10px 32px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Montserrat:wght@800;900&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  .container { max-width: 480px; margin: 0 auto; }
 
-        :root {
-            --black: #050508;
-            --black-soft: #0a0a10;
-            --black-card: #0e0e16;
-            --white: #ffffff;
-            --white-muted: rgba(255,255,255,0.6);
-            --white-dim: rgba(255,255,255,0.35);
-            --blue: #3b82f6;
-            --blue-bright: #60a5fa;
-            --blue-glow: rgba(59,130,246,0.3);
-            --blue-subtle: rgba(59,130,246,0.08);
-            --border: rgba(255,255,255,0.07);
-            --border-blue: rgba(59,130,246,0.25);
-            --yellow: #fbbf24;
-            --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-logo: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            --radius: 16px;
-            --radius-lg: 24px;
-            --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
-        }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2px 2px 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 7px;
+    background: var(--blue); color: var(--white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; flex-shrink: 0; letter-spacing: -0.03em;
+  }
+  .brand-text { line-height: 1.15; }
+  .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-name .accent { color: var(--blue-bright); }
+  .subtitle { font-size: 11px; color: var(--white-dim); }
+  .rate-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12px; color: var(--white-muted);
+  }
+  .rate-chip b { color: var(--blue-bright); font-weight: 700; }
+  .rate-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--blue-bright);
+    animation: pulse 2.2s ease infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @media (prefers-reduced-motion: reduce) { .rate-dot { animation: none; } }
 
-        html { scroll-behavior: smooth; }
+  .tabs {
+    display: flex; gap: 18px; border-bottom: 1px solid var(--border);
+    margin-bottom: 14px; overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0; padding: 0 0 10px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--white-dim);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: var(--transition);
+  }
+  .tab.active { color: var(--white); border-bottom-color: var(--blue); }
+  .hidden { display: none !important; }
 
-        body {
-            font-family: var(--font);
-            background: var(--black);
-            color: var(--white);
-            line-height: 1.6;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
+  .group {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--black-card);
+    overflow: hidden; margin-bottom: 10px;
+  }
+  .group-title {
+    font-size: 10.5px; font-weight: 700; color: var(--white-dim);
+    text-transform: uppercase; letter-spacing: 0.07em;
+    padding: 10px 14px 6px;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 12px 14px; border-top: 1px solid var(--border);
+  }
+  .row:first-of-type { border-top: none; }
+  .row-label { font-size: 13px; color: var(--white-muted); flex-shrink: 0; }
+  .row-value { font-size: 13.5px; font-weight: 600; color: var(--white); text-align: right; }
 
-        .container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+  .field-row { padding: 10px 14px; border-top: 1px solid var(--border); }
+  .field-row:first-of-type { border-top: none; }
+  .field-row label {
+    display: block; font-size: 10.5px; font-weight: 600; color: var(--white-dim);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;
+  }
+  input, select, textarea {
+    width: 100%; padding: 0; border: none; background: transparent;
+    color: var(--white); font-size: 16px; font-family: var(--font); outline: none;
+  }
+  input::placeholder, textarea::placeholder { color: var(--white-dim); }
+  select { -webkit-appearance: none; appearance: none; font-size: 14px; padding: 2px 0; color-scheme: dark; }
 
-        .bg-grid {
-            position: fixed; inset: 0;
-            background-image:
-                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
-            background-size: 60px 60px;
-            pointer-events: none; z-index: 0;
-        }
-        .bg-glow {
-            position: fixed; border-radius: 50%;
-            filter: blur(120px); pointer-events: none; z-index: 0;
-        }
-        .bg-glow--1 {
-            width: 500px; height: 500px;
-            background: rgba(59,130,246,0.08);
-            top: -200px; right: -100px;
-        }
-        .bg-glow--2 {
-            width: 400px; height: 400px;
-            background: rgba(59,130,246,0.05);
-            bottom: -150px; left: -100px;
-        }
+  .boxed-input {
+    width: 100%; padding: 11px 12px; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--black-soft); color: var(--white); font-family: var(--font); outline: none;
+  }
+  .boxed-input:focus { border-color: var(--blue); }
 
-        .nav {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-            padding: 16px 0; transition: var(--transition);
-            backdrop-filter: blur(20px);
-            background: rgba(5,5,8,0.8);
-            border-bottom: 1px solid transparent;
-        }
-        .nav--scrolled { border-bottom-color: var(--border); }
-        .nav__inner {
-            max-width: 1140px; margin: 0 auto; padding: 0 24px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
+  button.primary {
+    width: 100%; padding: 13px; border: none; border-radius: 9px;
+    background: var(--blue); color: var(--white);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: var(--font); transition: var(--transition);
+  }
+  button.primary:hover { background: var(--blue-bright); }
+  button.primary:active { transform: scale(0.985); }
+  button.small {
+    padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: 7px;
+    border: 1px dashed var(--border); background: transparent;
+    color: var(--white-muted); cursor: pointer; font-family: var(--font);
+    width: 100%; transition: var(--transition);
+  }
+  button.small:hover { border-color: var(--blue); color: var(--white); }
 
-        .nav__logo {
-            font-family: var(--font-logo);
-            font-size: 1.15rem;
-            font-weight: 900;
-            color: var(--white);
-            text-decoration: none;
-            display: flex; align-items: center;
-            gap: 8px;
-            letter-spacing: -0.01em;
-            text-transform: uppercase;
-        }
-        .nav__logo-icon { color: var(--blue); font-size: 1.4rem; font-family: var(--font); }
-        .nav__logo-accent { color: var(--blue); }
-        .nav__links { display: flex; gap: 28px; }
-        .nav__link {
-            color: var(--white-muted); text-decoration: none;
-            font-size: 0.9rem; font-weight: 500; transition: var(--transition);
-        }
-        .nav__link:hover { color: var(--white); }
-        .nav__link.active { color: var(--blue-bright); }
-        .nav__cta {
-            padding: 10px 20px; background: var(--blue); color: var(--white);
-            text-decoration: none; border-radius: 100px;
-            font-size: 0.85rem; font-weight: 600; transition: var(--transition);
-        }
-        .nav__cta:hover { background: var(--blue-bright); box-shadow: 0 0 30px var(--blue-glow); }
+  .row.total .row-label { color: var(--white); font-weight: 600; }
+  .row.total .row-value { font-size: 19px; font-weight: 800; color: var(--blue-bright); }
+  .row.total { background: var(--blue-subtle); }
 
-        .hero {
-            position: relative; z-index: 1;
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 60px; align-items: center;
-            max-width: 1140px; margin: 0 auto;
-            padding: 160px 24px 100px; min-height: 100vh;
-        }
-        .hero__badge {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 8px 16px; background: var(--blue-subtle);
-            border: 1px solid var(--border-blue); border-radius: 100px;
-            font-size: 0.8rem; font-weight: 500; color: var(--blue-bright);
-            margin-bottom: 24px; animation: fadeUp 0.6s ease both;
-        }
-        .hero__badge-dot {
-            width: 6px; height: 6px; background: var(--blue);
-            border-radius: 50%; animation: pulse 2s ease infinite;
-        }
-        @keyframes pulse {
-            0%,100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.3); }
-        }
-        .hero__title {
-            font-size: clamp(2.2rem, 4.5vw, 3.5rem); font-weight: 800;
-            line-height: 1.1; letter-spacing: -0.03em;
-            margin-bottom: 24px; animation: fadeUp 0.6s ease 0.1s both;
-        }
-        .hero__title-accent {
-            background: linear-gradient(135deg, var(--blue) 0%, var(--blue-bright) 50%, #a78bfa 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .hero__subtitle {
-            font-size: 1.05rem; color: var(--white-muted);
-            max-width: 480px; margin-bottom: 36px;
-            animation: fadeUp 0.6s ease 0.2s both;
-        }
-        .hero__actions {
-            display: flex; gap: 16px; margin-bottom: 48px;
-            animation: fadeUp 0.6s ease 0.3s both; flex-wrap: wrap;
-        }
-        .hero__stats {
-            display: flex; align-items: center; gap: 24px;
-            animation: fadeUp 0.6s ease 0.4s both;
-        }
-        .hero__stat { display: flex; flex-direction: column; }
-        .hero__stat-value { font-size: 1.5rem; font-weight: 700; color: var(--white); }
-        .hero__stat-label {
-            font-size: 0.8rem; color: var(--white-dim);
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .hero__stat-divider { width: 1px; height: 36px; background: var(--border); }
-        .hero__visual { animation: fadeUp 0.8s ease 0.3s both; }
-        .hero__image-wrapper {
-            position: relative; border-radius: var(--radius-lg);
-            overflow: hidden; border: 1px solid var(--border);
-            box-shadow: 0 40px 80px rgba(0,0,0,0.5);
-        }
-        .hero__image {
-            width: 100%; height: 480px; object-fit: cover;
-            display: block; transition: transform 0.6s ease;
-        }
-        .hero__image-wrapper:hover .hero__image { transform: scale(1.03); }
-        .hero__image-overlay {
-            position: absolute; inset: 0;
-            background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, transparent 60%);
-            pointer-events: none;
-        }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(24px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+  .empty { text-align: center; color: var(--white-dim); padding: 22px 14px; font-size: 13px; }
 
-        .btn {
-            display: inline-flex; align-items: center; justify-content: center;
-            padding: 14px 28px; border-radius: 100px;
-            font-size: 0.9rem; font-weight: 600;
-            text-decoration: none; cursor: pointer; border: none;
-            transition: var(--transition); font-family: var(--font);
-        }
-        .btn--primary {
-            background: var(--blue); color: var(--white);
-            box-shadow: 0 0 0 0 var(--blue-glow);
-        }
-        .btn--primary:hover {
-            background: var(--blue-bright);
-            box-shadow: 0 0 40px var(--blue-glow);
-            transform: translateY(-2px);
-        }
-        .btn--ghost {
-            background: transparent; color: var(--white);
-            border: 1px solid var(--border);
-        }
-        .btn--ghost:hover {
-            border-color: var(--border-blue);
-            background: var(--blue-subtle);
-        }
-        .btn--full { width: 100%; }
+  .order-row {
+    padding: 11px 14px; border-top: 1px solid var(--border);
+    cursor: pointer; transition: var(--transition);
+  }
+  .order-row:first-of-type { border-top: none; }
+  .order-row:hover { background: rgba(255,255,255,0.02); }
+  .order-row .top-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .order-row .status { font-size: 13px; font-weight: 600; }
+  .order-row .total { font-size: 13.5px; font-weight: 700; color: var(--blue-bright); flex-shrink: 0; }
+  .order-row .meta { font-size: 11px; color: var(--white-dim); margin-top: 2px; }
 
-        .section-header { text-align: center; margin-bottom: 60px; }
-        .section-tag {
-            display: inline-block; font-size: 0.75rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.1em;
-            color: var(--blue); margin-bottom: 12px;
-        }
-        .section-title {
-            font-size: clamp(1.8rem, 3.5vw, 2.5rem); font-weight: 700;
-            letter-spacing: -0.02em; line-height: 1.2;
-        }
-        .section-title--left { text-align: left; }
-        .section-subtitle { color: var(--white-muted); margin-top: 12px; }
+  .bonus-strip { display: flex; align-items: baseline; justify-content: space-between; padding: 16px 14px; }
+  .bonus-big { font-size: 34px; font-weight: 800; }
+  .bonus-sub { font-size: 11.5px; color: var(--white-dim); max-width: 140px; text-align: right; line-height: 1.4; }
 
-        .calculator-section { position: relative; z-index: 1; padding: 100px 0; }
-        .calculator { max-width: 520px; margin: 0 auto; }
-        .calculator__card {
-            background: var(--black-card); border: 1px solid var(--border);
-            border-radius: var(--radius-lg); padding: 40px;
-            position: relative; overflow: hidden;
-        }
-        .calculator__card::before {
-            content: ''; position: absolute;
-            top: 0; left: 0; right: 0; height: 1px;
-            background: linear-gradient(90deg, transparent, var(--blue), transparent);
-            opacity: 0.5;
-        }
-        .calculator__field { margin-bottom: 20px; }
-        .calculator__label {
-            display: block; font-size: 0.85rem; font-weight: 500;
-            color: var(--white-muted); margin-bottom: 10px;
-        }
-        .calculator__input-wrapper { position: relative; }
-        .calculator__input {
-            width: 100%; padding: 16px 50px 16px 18px;
-            background: var(--black-soft); border: 1px solid var(--border);
-            border-radius: var(--radius); color: var(--white);
-            font-size: 1.1rem; font-weight: 600; font-family: var(--font);
-            outline: none; transition: var(--transition);
-        }
-        .calculator__input:focus {
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px var(--blue-subtle);
-        }
-        .calculator__input::placeholder { color: var(--white-dim); font-weight: 400; }
-        .calculator__unit {
-            position: absolute; right: 18px; top: 50%;
-            transform: translateY(-50%); color: var(--white-dim);
-            font-size: 0.9rem; pointer-events: none;
-        }
-        .calculator__rate {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px 18px; background: var(--blue-subtle);
-            border: 1px solid var(--border-blue); border-radius: var(--radius);
-            margin-bottom: 24px; font-size: 0.85rem;
-        }
-        .calculator__rate-label { color: var(--white-muted); }
-        .calculator__rate-value { color: var(--blue-bright); font-weight: 600; }
-        .calculator__result {
-            margin-top: 28px; padding-top: 28px;
-            border-top: 1px solid var(--border);
-            opacity: 0; transform: translateY(10px);
-            transition: var(--transition);
-        }
-        .calculator__result.visible { opacity: 1; transform: translateY(0); }
-        .calculator__result-row {
-            display: flex; justify-content: space-between;
-            font-size: 0.9rem; color: var(--white-muted); margin-bottom: 10px;
-        }
-        .calculator__result-total {
-            display: flex; justify-content: space-between;
-            font-size: 1.3rem; font-weight: 700; color: var(--white);
-            margin-top: 16px; padding-top: 16px;
-            border-top: 1px solid var(--border);
-        }
-        .calculator__result-total span:last-child { color: var(--blue-bright); }
-        .calculator__note {
-            font-size: 0.75rem; color: var(--white-dim);
-            margin-top: 20px; line-height: 1.5;
-        }
-        .calculator__warn {
-            display: flex; gap: 10px;
-            font-size: 0.8rem; line-height: 1.55;
-            color: rgba(251,191,36,0.95);
-            background: rgba(251,191,36,0.07);
-            border: 1px solid rgba(251,191,36,0.22);
-            border-radius: var(--radius);
-            padding: 12px 14px;
-            margin-top: 20px;
-        }
-        .calculator__warn b { color: var(--yellow); }
+  .user-row {
+    padding: 10px 14px; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; gap: 10px;
+  }
+  .user-row:first-of-type { border-top: none; }
+  .user-row .user-left { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+  .user-row .user-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .badge {
+    font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+    background: rgba(255,255,255,0.08); color: var(--white-muted);
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .badge.admin { background: var(--blue-subtle); color: var(--blue-bright); }
+  .badge-btn {
+    font-size: 10px; font-weight: 700; padding: 5px 9px; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--white-muted); cursor: pointer; font-family: var(--font);
+    text-transform: uppercase; letter-spacing: 0.03em;
+    transition: var(--transition);
+  }
+  .badge-btn:hover { border-color: var(--blue); color: var(--white); }
+  .badge-btn.danger:hover { border-color: var(--red); color: var(--red); }
 
-        .how { position: relative; z-index: 1; padding: 100px 0; }
-        .how__steps {
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
-        }
-        .how__step {
-            padding: 32px 24px; background: var(--black-card);
-            border: 1px solid var(--border); border-radius: var(--radius-lg);
-            transition: var(--transition);
-        }
-        .how__step:hover {
-            border-color: var(--border-blue); transform: translateY(-4px);
-        }
-        .how__step-number {
-            display: block; font-size: 0.75rem; font-weight: 700;
-            color: var(--blue); letter-spacing: 0.1em; margin-bottom: 16px;
-        }
-        .how__step-title { font-size: 1.05rem; font-weight: 600; margin-bottom: 8px; }
-        .how__step-desc { font-size: 0.85rem; color: var(--white-muted); line-height: 1.5; }
+  .product-row {
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px; margin: 0 14px 10px; background: var(--black-soft);
+  }
+  .product-row:first-of-type { margin-top: 10px; }
+  .product-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .product-grid .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .product-row .remove-btn {
+    background: transparent; color: var(--red); border: none;
+    padding: 6px 0 0; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    font-family: var(--font); text-align: left;
+  }
 
-        .usa { position: relative; z-index: 1; padding: 100px 0; }
-        .usa__grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 60px; align-items: center;
-        }
-        .usa__desc { color: var(--white-muted); margin: 16px 0 28px; max-width: 460px; }
-        .usa__list {
-            list-style: none; display: flex; flex-direction: column;
-            gap: 14px; margin-bottom: 32px;
-        }
-        .usa__list-item {
-            display: flex; align-items: flex-start; gap: 12px;
-            font-size: 0.95rem; color: var(--white-muted);
-        }
-        .usa__list-icon {
-            flex-shrink: 0; width: 22px; height: 22px;
-            display: flex; align-items: center; justify-content: center;
-            background: var(--blue-subtle); border: 1px solid var(--border-blue);
-            border-radius: 50%; color: var(--blue-bright);
-            font-size: 0.7rem; font-weight: 700; margin-top: 2px;
-        }
-        .usa__visual { position: relative; animation: fadeUp 0.8s ease both; }
-        .usa__info-card {
-            padding: 36px;
-            background: var(--black-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            position: relative;
-            overflow: hidden;
-        }
-        .usa__info-card::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--blue), var(--blue-bright), #a78bfa);
-        }
-        .usa__info-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.9rem;
-        }
-        .usa__info-row:last-of-type { border-bottom: none; }
-        .usa__info-label { color: var(--white-muted); }
-        .usa__info-value {
-            color: var(--white);
-            font-weight: 600;
-            text-align: right;
-        }
-        .usa__info-total {
-            display: flex;
-            justify-content: space-between;
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--white);
-            margin-top: 12px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-        }
-        .usa__info-total span:last-child { color: var(--blue-bright); }
+  /* ========== ФУТЕР С КОНТАКТАМИ (внизу каждой вкладки) ========== */
+  .contacts-footer {
+    margin-top: 20px;
+    padding: 16px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--black-card);
+  }
+  .contacts-footer__title {
+    font-size: 10.5px; font-weight: 700; color: var(--white-dim);
+    text-transform: uppercase; letter-spacing: 0.07em;
+    margin-bottom: 10px;
+  }
+  .contacts-footer__links {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .contacts-footer__link {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--black-soft);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--white);
+    transition: var(--transition);
+  }
+  .contacts-footer__link:hover {
+    border-color: rgba(59,130,246,0.4);
+    background: var(--blue-subtle);
+  }
+  .contacts-footer__link-label {
+    font-size: 11px; color: var(--white-dim); text-transform: uppercase;
+    letter-spacing: 0.05em; font-weight: 600;
+  }
+  .contacts-footer__link-value {
+    font-size: 13px; font-weight: 600; color: var(--blue-bright);
+  }
 
-        .platforms { position: relative; z-index: 1; padding: 100px 0; }
-        .platforms__grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
-        }
-        .platform-card {
-            padding: 28px 24px; background: var(--black-card);
-            border: 1px solid var(--border); border-radius: var(--radius-lg);
-            transition: var(--transition); text-decoration: none;
-            color: var(--white); display: block;
-        }
-        .platform-card:hover {
-            border-color: var(--border-blue); transform: translateY(-4px);
-            background: var(--blue-subtle);
-        }
-        .platform-card__icon { font-size: 1.8rem; margin-bottom: 16px; display: block; color: var(--blue); }
-        .platform-card__title { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
-        .platform-card__desc {
-            font-size: 0.85rem; color: var(--white-muted);
-            line-height: 1.5; margin-bottom: 16px;
-        }
-        .platform-card__link { font-size: 0.85rem; color: var(--blue-bright); font-weight: 600; }
+  /* ---------- МОДАЛКА ЗАКАЗА ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.75);
+    display: none; align-items: flex-end;
+    padding: 0;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal-sheet {
+    background: var(--black-card);
+    width: 100%; max-height: 90vh; overflow-y: auto;
+    border-radius: 18px 18px 0 0;
+    padding: 18px 14px 30px;
+    animation: slideUp 0.22s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle {
+    width: 40px; height: 4px; background: rgba(255,255,255,0.15);
+    border-radius: 4px; margin: 0 auto 14px;
+  }
+  .modal-title {
+    font-size: 16px; font-weight: 700; margin-bottom: 4px;
+  }
+  .modal-subtitle {
+    font-size: 11px; color: var(--white-dim); margin-bottom: 14px;
+  }
+  .modal-status {
+    display: inline-block; padding: 4px 9px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; margin-bottom: 14px;
+    background: var(--blue-subtle); color: var(--blue-bright);
+  }
+  .modal-status.closed { background: rgba(16,185,129,0.12); color: var(--green); }
+  .modal-status.warn { background: rgba(251,191,36,0.12); color: var(--yellow); }
 
-        .contacts { position: relative; z-index: 1; padding: 100px 0; }
-        .contacts__grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 60px; align-items: start;
-        }
-        .contacts__desc { color: var(--white-muted); margin: 16px 0 36px; max-width: 400px; }
-        .contacts__list { display: flex; flex-direction: column; gap: 16px; }
-        .contacts__item {
-            display: flex; align-items: center; gap: 16px;
-            padding: 20px 24px; background: var(--black-card);
-            border: 1px solid var(--border); border-radius: var(--radius);
-            text-decoration: none; color: var(--white); transition: var(--transition);
-        }
-        .contacts__item:hover {
-            border-color: var(--border-blue); background: var(--blue-subtle);
-        }
-        .contacts__item-icon {
-            font-size: 1.5rem; width: 48px; height: 48px;
-            display: flex; align-items: center; justify-content: center;
-            background: var(--black-soft); border-radius: 12px;
-            color: var(--blue); flex-shrink: 0;
-        }
-        .contacts__item-label {
-            display: block; font-size: 0.75rem; color: var(--white-dim);
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .contacts__item-value { display: block; font-size: 1.05rem; font-weight: 600; }
-        .contacts__card {
-            padding: 40px; background: var(--black-card);
-            border: 1px solid var(--border); border-radius: var(--radius-lg);
-            position: relative; overflow: hidden;
-        }
-        .contacts__card::before {
-            content: ''; position: absolute;
-            top: 0; left: 0; right: 0; height: 2px;
-            background: linear-gradient(90deg, var(--blue), var(--blue-bright), #a78bfa);
-        }
-        .contacts__card-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; }
-        .contacts__card-desc { font-size: 0.9rem; color: var(--white-muted); margin-bottom: 28px; }
+  .warn-box {
+    background: rgba(251,191,36,0.08);
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 9px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: rgba(251,191,36,0.9);
+    line-height: 1.5;
+  }
+  .warn-box b { color: var(--yellow); }
 
-        .footer {
-            position: relative; z-index: 1;
-            padding: 32px 0; border-top: 1px solid var(--border);
-        }
-        .footer__inner { display: flex; align-items: center; justify-content: space-between; }
+  .modal-product {
+    padding: 10px 0; border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .modal-product:first-of-type { border-top: none; }
+  .modal-product .p-name { font-weight: 600; margin-bottom: 3px; }
+  .modal-product .p-info { font-size: 11.5px; color: var(--white-dim); }
+  .modal-product .p-info a { color: var(--blue-bright); text-decoration: none; }
+  .modal-product .p-price { font-weight: 700; color: var(--blue-bright); float: right; }
 
-        .footer__logo {
-            font-family: var(--font-logo);
-            font-size: 1rem;
-            font-weight: 900;
-            letter-spacing: -0.01em;
-            text-transform: uppercase;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .footer__copy { font-size: 0.8rem; color: var(--white-dim); }
-
-        @media (max-width: 968px) {
-            .hero { grid-template-columns: 1fr; padding-top: 120px; text-align: center; min-height: auto; }
-            .hero__subtitle { margin-left: auto; margin-right: auto; }
-            .hero__actions { justify-content: center; }
-            .hero__stats { justify-content: center; }
-            .hero__visual { order: -1; }
-            .hero__image { height: 300px; }
-            .how__steps { grid-template-columns: repeat(2, 1fr); }
-            .usa__grid { grid-template-columns: 1fr; gap: 40px; }
-            .usa__visual { order: -1; }
-            .platforms__grid { grid-template-columns: repeat(2, 1fr); }
-            .contacts__grid { grid-template-columns: 1fr; }
-            .nav__links { display: none; }
-        }
-        @media (max-width: 568px) {
-            .hero__actions { flex-direction: column; width: 100%; }
-            .hero__actions .btn { width: 100%; }
-            .how__steps { grid-template-columns: 1fr; }
-            .calculator__card { padding: 24px; }
-            .hero__stats { flex-direction: column; gap: 16px; }
-            .hero__stat-divider { width: 40px; height: 1px; }
-            .footer__inner { flex-direction: column; gap: 12px; text-align: center; }
-            .platforms__grid { grid-template-columns: 1fr; }
-            .usa__info-card { padding: 24px; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                transition-duration: 0.01ms !important;
-            }
-            html { scroll-behavior: auto; }
-        }
-    </style>
+  .modal-btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  .modal-btn-row button { flex: 1; }
+</style>
 </head>
 <body>
+<div class="container">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">PS</div>
+      <div class="brand-text">
+        <div class="brand-name">Pacific<span class="accent">Style</span></div>
+        <div class="subtitle" id="hello">Загрузка...</div>
+      </div>
+    </div>
+    <div class="rate-chip"><span class="rate-dot"></span><span>Курс <b id="rate">—</b></span></div>
+  </div>
 
-    <div class="bg-grid"></div>
-    <div class="bg-glow bg-glow--1"></div>
-    <div class="bg-glow bg-glow--2"></div>
+  <div class="tabs">
+    <div class="tab active" data-tab="calc">Расчёт</div>
+    <div class="tab" data-tab="orders">Заказы</div>
+    <div class="tab" data-tab="bonus">Баллы</div>
+    <div class="tab hidden" data-tab="admin" id="admin-tab">Админ</div>
+  </div>
 
-    <nav class="nav" id="nav">
-        <div class="nav__inner">
-            <a href="index.html" class="nav__logo">
-                <span class="nav__logo-icon">◈</span>
-                Pacific <span class="nav__logo-accent">Style</span>
-            </a>
-            <div class="nav__links">
-                <a href="#calculator" class="nav__link">Калькулятор</a>
-                <a href="#how" class="nav__link">Как это работает</a>
-                <a href="#usa" class="nav__link">Из США</a>
-                <a href="instructions.html" class="nav__link">Инструкции</a>
-                <a href="#contacts" class="nav__link">Контакты</a>
-            </div>
-            <a href="tel:+79146755735" class="nav__cta">Связаться</a>
+  <!-- КАЛЬКУЛЯТОР -->
+  <section id="tab-calc">
+    <div class="group">
+      <div class="field-row">
+        <label>Стоимость товара, ¥</label>
+        <input type="number" id="cny" placeholder="Например, 299" min="0" step="0.01">
+      </div>
+    </div>
+
+    <div class="group hidden" id="calc-result">
+      <div class="row"><span class="row-label">Товар</span><span class="row-value" id="r-product">—</span></div>
+      <div class="row"><span class="row-label">Доставка (предв.)</span><span class="row-value" id="r-delivery">599 ₽</span></div>
+      <div class="row"><span class="row-label">Комиссия</span><span class="row-value" id="r-commission">550 ₽</span></div>
+      <div class="row total"><span class="row-label">Итого</span><span class="row-value" id="r-total">—</span></div>
+    </div>
+
+    <div class="warn-box" style="margin-top:14px;">
+      ⚠️ <b>О доставке.</b><br>
+      Стоимость доставки рассчитывается по весу и оплачивается отдельно — <b>перед отправлением со склада в Китае</b>. Итоговая сумма может отличаться от предварительной.
+    </div>
+
+    <!-- КОНТАКТЫ -->
+    <div class="contacts-footer">
+      <div class="contacts-footer__title">Связаться с нами</div>
+      <div class="contacts-footer__links">
+        <a class="contacts-footer__link" href="https://t.me/kuzz767" target="_blank">
+          <span class="contacts-footer__link-label">Telegram</span>
+          <span class="contacts-footer__link-value">@kuzz767</span>
+        </a>
+        <a class="contacts-footer__link" href="mailto:admin@pacificstyle.ru">
+          <span class="contacts-footer__link-label">Email</span>
+          <span class="contacts-footer__link-value">admin@pacificstyle.ru</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ЗАКАЗЫ -->
+  <section id="tab-orders" class="hidden">
+    <div class="group-title">Мои заказы</div>
+    <div class="group" id="orders-list"><div class="empty">Загрузка...</div></div>
+
+    <!-- КОНТАКТЫ -->
+    <div class="contacts-footer">
+      <div class="contacts-footer__title">Связаться с нами</div>
+      <div class="contacts-footer__links">
+        <a class="contacts-footer__link" href="https://t.me/kuzz767" target="_blank">
+          <span class="contacts-footer__link-label">Telegram</span>
+          <span class="contacts-footer__link-value">@kuzz767</span>
+        </a>
+        <a class="contacts-footer__link" href="mailto:admin@pacificstyle.ru">
+          <span class="contacts-footer__link-label">Email</span>
+          <span class="contacts-footer__link-value">admin@pacificstyle.ru</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- БАЛЛЫ -->
+  <section id="tab-bonus" class="hidden">
+    <div class="group">
+      <div class="bonus-strip">
+        <div class="bonus-big" id="bonus-total">0</div>
+        <div class="bonus-sub">1 балл = 1 ₽ скидки на комиссию</div>
+      </div>
+    </div>
+    <div class="group-title">История начислений</div>
+    <div class="group" id="bonus-log"><div class="empty">Пока пусто</div></div>
+
+    <!-- КОНТАКТЫ -->
+    <div class="contacts-footer">
+      <div class="contacts-footer__title">Связаться с нами</div>
+      <div class="contacts-footer__links">
+        <a class="contacts-footer__link" href="https://t.me/kuzz767" target="_blank">
+          <span class="contacts-footer__link-label">Telegram</span>
+          <span class="contacts-footer__link-value">@kuzz767</span>
+        </a>
+        <a class="contacts-footer__link" href="mailto:admin@pacificstyle.ru">
+          <span class="contacts-footer__link-label">Email</span>
+          <span class="contacts-footer__link-value">admin@pacificstyle.ru</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- АДМИН (без контактов) -->
+  <section id="tab-admin" class="hidden">
+    <div class="group-title">Курс юаня</div>
+    <div class="group">
+      <div class="field-row">
+        <label>Курс CNY → RUB</label>
+        <input type="number" id="admin-rate" step="0.01" class="boxed-input" style="font-size:16px;">
+      </div>
+    </div>
+    <button class="primary" id="btn-save-rate" style="margin-bottom:16px;">Сохранить курс</button>
+
+    <div class="group-title">Создать заказ</div>
+    <div class="group">
+      <div class="field-row">
+        <label>Пользователь</label>
+        <select id="order-user"></select>
+      </div>
+      <div class="field-row">
+        <label>Комиссия, ₽</label>
+        <input type="number" id="order-commission" value="550" step="1">
+      </div>
+      <div class="field-row">
+        <label>Доставка (предв.), ₽</label>
+        <input type="number" id="order-delivery" value="599" step="1">
+      </div>
+    </div>
+    <div id="order-products"></div>
+    <button class="small" id="btn-add-product" style="margin-bottom:10px;">+ добавить товар</button>
+    <button class="primary" id="btn-create-order" style="margin-bottom:16px;">Создать заказ</button>
+
+    <div class="group-title">Поиск заказа по ID</div>
+    <div class="group">
+      <div class="field-row">
+        <input type="number" id="search-order-id" placeholder="Номер заказа, например 5">
+      </div>
+    </div>
+    <button class="primary" id="btn-search-order" style="margin-bottom:16px;">Найти заказ</button>
+
+    <div class="group-title">Пользователи</div>
+    <div class="group" id="admin-users"><div class="empty">Загрузка...</div></div>
+
+    <div class="group-title" style="margin-top:14px;">Начислить баллы</div>
+    <div class="group">
+      <div class="field-row"><select id="bonus-user"></select></div>
+      <div class="field-row"><input type="number" id="bonus-amount" placeholder="Сколько баллов"></div>
+      <div class="field-row"><input type="text" id="bonus-reason" placeholder="Причина (закрытый заказ / реферал)"></div>
+    </div>
+    <button class="primary" id="btn-award" style="margin-bottom:16px;">Начислить</button>
+
+    <div class="group-title">Все заказы</div>
+    <div class="group" id="admin-orders"><div class="empty">Загрузка...</div></div>
+  </section>
+</div>
+
+<!-- МОДАЛКА ЗАКАЗА -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  try { tg.setHeaderColor("#050508"); } catch (e) {}
+  try { tg.setBackgroundColor("#050508"); } catch (e) {}
+  try { tg.setBottomBarColor("#050508"); } catch (e) {}
+}
+const INIT = tg?.initData || "";
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Telegram-Init-Data": INIT,
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || res.statusText);
+  }
+  return res.json();
+}
+
+const fmt = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
+
+function animateNumber(el, target, suffix = " ₽", duration = 550) {
+  const start = performance.now();
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = new Intl.NumberFormat("ru-RU").format(Math.round(target * eased)) + suffix;
+    if (progress < 1) requestAnimationFrame(tick);
+    else el.textContent = new Intl.NumberFormat("ru-RU").format(Math.round(target)) + suffix;
+  }
+  requestAnimationFrame(tick);
+}
+
+const STATUS_LABELS = {
+  created: "Оформлен",
+  cn_warehouse: "На складе в Китае",
+  in_transit: "В пути в ваш город",
+  delivered: "Доставлен",
+  closed: "Завершён",
+};
+
+// ---------- Tabs ----------
+document.querySelectorAll(".tab").forEach((t) => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll("section").forEach((x) => x.classList.add("hidden"));
+    t.classList.add("active");
+    document.getElementById("tab-" + t.dataset.tab).classList.remove("hidden");
+    if (t.dataset.tab === "orders") loadOrders();
+    if (t.dataset.tab === "bonus") loadBonus();
+    if (t.dataset.tab === "admin") loadAdmin();
+  });
+});
+
+// ---------- State ----------
+let ME = null;
+let RATE = 12.5;
+
+async function loadMe() {
+  try {
+    ME = await api("/api/me");
+    document.getElementById("hello").textContent = `${ME.first_name}`;
+    if (ME.is_admin) document.getElementById("admin-tab").classList.remove("hidden");
+  } catch (e) {
+    document.getElementById("hello").textContent = "Войдите через бота";
+  }
+}
+
+async function loadRate() {
+  const { rate } = await api("/api/rate");
+  RATE = rate;
+  document.getElementById("rate").textContent = rate.toFixed(2);
+  document.getElementById("admin-rate").value = rate;
+  calc();
+}
+
+// ---------- Калькулятор ----------
+document.getElementById("cny").addEventListener("input", calc);
+function calc() {
+  const cny = parseFloat(document.getElementById("cny").value);
+  const card = document.getElementById("calc-result");
+  if (!cny || cny <= 0) return card.classList.add("hidden");
+  const product = cny * RATE;
+  const total = product + 599 + 550;
+  document.getElementById("r-product").textContent = fmt(product);
+  card.classList.remove("hidden");
+  animateNumber(document.getElementById("r-total"), total);
+}
+
+// ---------- Заказы пользователя ----------
+async function loadOrders() {
+  try {
+    const list = await api("/api/orders");
+    const el = document.getElementById("orders-list");
+    if (!list.length) {
+      el.innerHTML = `<div class="empty">Заказов пока нет</div>`;
+      return;
+    }
+    el.innerHTML = list
+      .map(
+        (o) => `
+      <div class="order-row" onclick="openOrderModal(${o.id})">
+        <div class="top-line">
+          <span class="status">${STATUS_LABELS[o.status] || o.status} · #${o.id}</span>
+          <span class="total">${fmt(o.total_rub)}</span>
         </div>
-    </nav>
+        <div class="meta">${o.created_at} · ${o.products.length} товар(ов)</div>
+      </div>`
+      )
+      .join("");
+  } catch (e) {
+    console.error(e);
+  }
+}
 
-    <header class="hero">
-        <div class="hero__content">
-            <div class="hero__badge">
-                <span class="hero__badge-dot"></span>
-                Работаем с Китаем, Западом и США напрямую
-            </div>
-            <h1 class="hero__title">
-                Считайте стоимость<br>
-                <span class="hero__title-accent">товаров из Китая</span>
-            </h1>
-            <p class="hero__subtitle">
-                Введите цену в юанях — получите итог в рублях с учётом курса,
-                доставки и комиссии. Без скрытых платежей.
-            </p>
-            <div class="hero__actions">
-                <a href="#calculator" class="btn btn--primary">Открыть калькулятор</a>
-                <a href="instructions.html" class="btn btn--ghost">Инструкции по площадкам</a>
-            </div>
-            <div class="hero__stats">
-                <div class="hero__stat">
-                    <span class="hero__stat-value">599 ₽</span>
-                    <span class="hero__stat-label">доставка за кг</span>
-                </div>
-                <div class="hero__stat-divider"></div>
-                <div class="hero__stat">
-                    <span class="hero__stat-value">5–8</span>
-                    <span class="hero__stat-label">дней</span>
-                </div>
-                <div class="hero__stat-divider"></div>
-                <div class="hero__stat">
-                    <span class="hero__stat-value">550 ₽</span>
-                    <span class="hero__stat-label">комиссия</span>
-                </div>
-            </div>
+// ---------- Баллы ----------
+async function loadBonus() {
+  const data = await api("/api/bonus");
+  document.getElementById("bonus-total").textContent = data.points;
+  const el = document.getElementById("bonus-log");
+  if (!data.log.length) {
+    el.innerHTML = `<div class="empty">Пока пусто</div>`;
+    return;
+  }
+  el.innerHTML = data.log
+    .map(
+      (b) => `
+    <div class="user-row">
+      <div class="user-left">${b.reason || "—"}</div>
+      <div class="user-right">+${b.amount} · ${b.created_at}</div>
+    </div>`
+    )
+    .join("");
+}
+
+// ---------- Админ ----------
+async function loadAdmin() {
+  if (!ME?.is_admin) return;
+  try {
+    const users = await api("/api/admin/users");
+
+    document.getElementById("admin-users").innerHTML = users
+      .map((u) => {
+        const isMe = u.id === ME.id;
+        return `
+        <div class="user-row">
+          <div class="user-left">
+            <span>
+              ${u.first_name || "—"}
+              ${u.username ? `<span style="opacity:.6"> @${u.username}</span>` : ""}
+              ${u.is_admin ? `<span class="badge admin">ADMIN</span>` : ""}
+            </span>
+          </div>
+          <div class="user-right">
+            <span style="font-size:11px;color:var(--white-dim);">${u.bonus_points} б.</span>
+            ${!isMe ? `<button class="badge-btn ${u.is_admin ? 'danger' : ''}" onclick="toggleAdmin(${u.id}, ${u.is_admin ? 0 : 1})">${u.is_admin ? 'Снять' : 'Админ'}</button>` : ''}
+          </div>
+        </div>`;
+      })
+      .join("");
+
+    document.getElementById("bonus-user").innerHTML = users
+      .map((u) => `<option value="${u.id}">${u.first_name} (${u.bonus_points} б.)</option>`)
+      .join("");
+
+    document.getElementById("order-user").innerHTML = users
+      .map((u) => `<option value="${u.id}">${u.first_name} (${u.bonus_points} б.)</option>`)
+      .join("");
+
+    const orders = await api("/api/admin/orders");
+    const oEl = document.getElementById("admin-orders");
+    if (!orders.length) {
+      oEl.innerHTML = `<div class="empty">Заказов нет</div>`;
+      return;
+    }
+    oEl.innerHTML = orders
+      .map(
+        (o) => `
+      <div class="order-row" onclick="openOrderModal(${o.id}, true)">
+        <div class="top-line">
+          <span class="status">#${o.id} · ${STATUS_LABELS[o.status] || o.status}</span>
+          <span class="total">${fmt(o.total_rub)}</span>
         </div>
-        <div class="hero__visual">
-            <div class="hero__image-wrapper">
-                <img src="hero.jpg" alt="Логистический центр в Китае" class="hero__image" loading="eager">
-                <div class="hero__image-overlay"></div>
-            </div>
+        <div class="meta">${o.created_at}</div>
+      </div>`
+      )
+      .join("");
+  } catch (e) {
+    alert("Ошибка загрузки админки: " + e.message);
+  }
+}
+
+window.changeStatus = async (orderId, status) => {
+  try {
+    await api(`/api/admin/order/${orderId}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    closeModal();
+    loadAdmin();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
+};
+
+window.toggleAdmin = async (userId, isAdmin) => {
+  try {
+    await api("/api/admin/set_admin", {
+      method: "POST",
+      body: JSON.stringify({ user_id: userId, is_admin: isAdmin }),
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    loadAdmin();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
+};
+
+window.saveDelivery = async (orderId) => {
+  const input = document.getElementById("edit-delivery");
+  const delivery = parseFloat(input.value);
+  if (isNaN(delivery) || delivery < 0) return alert("Неверная стоимость");
+  try {
+    const res = await api(`/api/admin/order/${orderId}/delivery`, {
+      method: "POST",
+      body: JSON.stringify({ delivery }),
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    alert(`✅ Доставка обновлена.\n\nИтого: ${Math.round(res.total_rub)} ₽`);
+    closeModal();
+    loadAdmin();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
+};
+
+// ---------- Модалка заказа ----------
+async function openOrderModal(orderId, adminView = false) {
+  try {
+    const order = await api(`/api/order/${orderId}`);
+    const isClosed = order.status === "closed";
+    const isCnWarehouse = order.status === "cn_warehouse";
+    const statusClass = isClosed ? "closed" : (isCnWarehouse ? "warn" : "");
+
+    const productsHtml = order.products
+      .map(
+        (p) => `
+        <div class="modal-product">
+          <div class="p-name">${p.title || "—"} <span class="p-price">${Math.round(p.price_cny * order.cny_rate)} ₽</span></div>
+          <div class="p-info">
+            ${p.price_cny} ¥ × ${p.quantity} шт
+            ${p.url ? ` · <a href="${p.url}" target="_blank">ссылка</a>` : ""}
+          </div>
+        </div>`
+      )
+      .join("");
+
+    const adminBlock = adminView && ME?.is_admin
+      ? `
+      <div class="group-title" style="margin-top:14px;">Управление</div>
+      <div class="group">
+        <div class="field-row">
+          <label>Стоимость доставки, ₽</label>
+          <input type="number" id="edit-delivery" class="boxed-input" value="${order.delivery}" step="1">
         </div>
-    </header>
-
-    <section class="calculator-section" id="calculator">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Калькулятор</span>
-                <h2 class="section-title">Узнайте итоговую стоимость</h2>
-                <p class="section-subtitle">Введите цену товара в юанях — калькулятор посчитает всё автоматически</p>
-            </div>
-
-            <div class="calculator">
-                <div class="calculator__card">
-                    <div class="calculator__field">
-                        <label for="priceCny" class="calculator__label">Цена товара в юанях</label>
-                        <div class="calculator__input-wrapper">
-                            <input type="number" id="priceCny" class="calculator__input" placeholder="Например: 129.90" min="0.01" step="0.01" value="100">
-                            <span class="calculator__unit">¥</span>
-                        </div>
-                    </div>
-
-                    <div class="calculator__rate">
-                        <span class="calculator__rate-label">Курс юаня:</span>
-                        <span class="calculator__rate-value" id="rateValue">загрузка…</span>
-                    </div>
-
-                    <button class="btn btn--primary btn--full" id="calcBtn">Рассчитать</button>
-
-                    <div class="calculator__result" id="result">
-                        <div class="calculator__result-row">
-                            <span>Цена товара</span>
-                            <span id="resultPriceRub">—</span>
-                        </div>
-                        <div class="calculator__result-row">
-                            <span>Доставка (за кг)</span>
-                            <span id="resultDelivery">599 ₽</span>
-                        </div>
-                        <div class="calculator__result-row">
-                            <span>Комиссия</span>
-                            <span id="resultCommission">550 ₽</span>
-                        </div>
-                        <div class="calculator__result-total">
-                            <span>Итого:</span>
-                            <span id="resultTotal">—</span>
-                        </div>
-                    </div>
-
-                    <div class="calculator__warn">
-                        <span>⚠️</span>
-                        <div>
-                            <b>О доставке.</b><br>
-                            Стоимость доставки рассчитывается по весу и оплачивается отдельно — <b>перед отправлением со склада в Китае</b>. Итоговая сумма может отличаться от предварительной (зависит от фактического веса посылки).
-                        </div>
-                    </div>
-
-                    <p class="calculator__note">
-                        * Доставка указана за 1 кг. Итоговая стоимость зависит от фактического веса
-                        и объёма груза. Точную цену уточняйте у менеджера.
-                    </p>
-                </div>
-            </div>
+        <div class="field-row" style="padding-top:0;">
+          <button class="primary" style="margin-top:6px;" onclick="saveDelivery(${order.id})">Сохранить доставку</button>
         </div>
-    </section>
-
-    <section class="how" id="how">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Процесс</span>
-                <h2 class="section-title">Как это работает</h2>
-            </div>
-
-            <div class="how__steps">
-                <div class="how__step">
-                    <span class="how__step-number">01</span>
-                    <h3 class="how__step-title">Заявка</h3>
-                    <p class="how__step-desc">Свяжитесь с нами, обсудим товар и сроки</p>
-                </div>
-                <div class="how__step">
-                    <span class="how__step-number">02</span>
-                    <h3 class="how__step-title">Выкуп</h3>
-                    <p class="how__step-desc">Выкупаем товар у поставщика в Китае</p>
-                </div>
-                <div class="how__step">
-                    <span class="how__step-number">03</span>
-                    <h3 class="how__step-title">Склад в Китае</h3>
-                    <p class="how__step-desc">Приёмка, консолидация и взвешивание груза</p>
-                </div>
-                <div class="how__step">
-                    <span class="how__step-number">04</span>
-                    <h3 class="how__step-title">Доставка</h3>
-                    <p class="how__step-desc">5–8 дней до вашего города в России (срок зависит от вашего города)</p>
-                </div>
-            </div>
+        <div class="field-row">
+          <label>Изменить статус</label>
+          <select class="boxed-input" onchange="changeStatus(${order.id}, this.value)" style="margin-top:6px;">
+            ${Object.entries(STATUS_LABELS)
+              .map(([k, v]) => `<option value="${k}" ${k === order.status ? "selected" : ""}>${v}</option>`)
+              .join("")}
+          </select>
         </div>
-    </section>
+      </div>`
+      : "";
 
-    <section class="usa" id="usa">
-        <div class="container">
-            <div class="usa__grid">
-                <div class="usa__content">
-                    <span class="section-tag">Из США и Запада</span>
-                    <h2 class="section-title section-title--left">Заказы из Америки</h2>
-                    <p class="usa__desc">
-                        Также можем привезти товары из США и стран Запада — одежда,
-                        брендовые вещи, косметика и многое другое. Условия и сроки
-                        обсуждаются индивидуально.
-                    </p>
+    document.getElementById("modal-content").innerHTML = `
+      <div class="modal-title">Заказ #${order.id}</div>
+      <div class="modal-subtitle">${order.created_at}</div>
+      <div class="modal-status ${statusClass}">${STATUS_LABELS[order.status] || order.status}</div>
 
-                    <ul class="usa__list">
-                        <li class="usa__list-item">
-                            <span class="usa__list-icon">✓</span>
-                            <span>Условия и стоимость — по договорённости</span>
-                        </li>
-                        <li class="usa__list-item">
-                            <span class="usa__list-icon">✓</span>
-                            <span>Сроки зависят от категории товара и штата</span>
-                        </li>
-                        <li class="usa__list-item">
-                            <span class="usa__list-icon">✓</span>
-                            <span>Работаем с оригинальной продукцией</span>
-                        </li>
-                        <li class="usa__list-item">
-                            <span class="usa__list-icon">✓</span>
-                            <span>Рассчитаем стоимость индивидуально под ваш заказ</span>
-                        </li>
-                    </ul>
+      ${isCnWarehouse ? `<div class="warn-box">📦 Товар прибыл на склад в Китае. Необходимо оплатить доставку перед отправкой в ваш город.</div>` : ""}
 
-                    <a href="https://t.me/kuzz767" target="_blank" class="btn btn--primary">
-                        Обсудить заказ из США
-                    </a>
-                </div>
+      <div class="group-title" style="margin-top:6px;">Товары</div>
+      <div class="group" style="padding:0 14px;">
+        ${productsHtml}
+      </div>
 
-                <div class="usa__visual">
-                    <div class="usa__info-card">
-                        <div class="usa__info-row">
-                            <span class="usa__info-label">Условия</span>
-                            <span class="usa__info-value">По договорённости</span>
-                        </div>
-                        <div class="usa__info-row">
-                            <span class="usa__info-label">Сроки</span>
-                            <span class="usa__info-value">Индивидуально</span>
-                        </div>
-                        <div class="usa__info-row">
-                            <span class="usa__info-label">Категории</span>
-                            <span class="usa__info-value">Одежда, косметика, бренды</span>
-                        </div>
-                        <div class="usa__info-row">
-                            <span class="usa__info-label">Продукция</span>
-                            <span class="usa__info-value">Оригинал</span>
-                        </div>
-                        <div class="usa__info-row">
-                            <span class="usa__info-label">Маршрут</span>
-                            <span class="usa__info-value">США — Россия</span>
-                        </div>
-                        <div class="usa__info-total">
-                            <span>Расчёт</span>
-                            <span>Индивидуально</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      <div class="group-title">Стоимость</div>
+      <div class="group">
+        <div class="row"><span class="row-label">Товары (${order.cny_rate.toFixed(2)} ₽/¥)</span><span class="row-value">${fmt(order.products.reduce((s, p) => s + p.price_cny * p.quantity, 0) * order.cny_rate)}</span></div>
+        <div class="row"><span class="row-label">Доставка</span><span class="row-value">${fmt(order.delivery)}</span></div>
+        <div class="row"><span class="row-label">Комиссия</span><span class="row-value">${fmt(order.commission)}</span></div>
+        <div class="row total"><span class="row-label">Итого</span><span class="row-value">${fmt(order.total_rub)}</span></div>
+      </div>
+
+      ${adminBlock}
+
+      <div class="modal-btn-row">
+        <button class="primary" onclick="closeModal()">Закрыть</button>
+      </div>
+    `;
+
+    document.getElementById("modal").classList.add("active");
+    try { tg?.BackButton?.show(); tg?.BackButton?.onClick(closeModal); } catch (e) {}
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
+}
+window.openOrderModal = openOrderModal;
+
+function closeModal() {
+  document.getElementById("modal").classList.remove("active");
+  try { tg?.BackButton?.hide(); } catch (e) {}
+}
+window.closeModal = closeModal;
+
+// ---------- Сохранить курс ----------
+document.getElementById("btn-save-rate").onclick = async () => {
+  const rate = parseFloat(document.getElementById("admin-rate").value);
+  if (!rate || rate <= 0) return alert("Введи корректный курс (число больше 0)");
+  try {
+    await api("/api/admin/rate", { method: "POST", body: JSON.stringify({ rate }) });
+    await loadRate();
+    tg?.HapticFeedback?.notificationOccurred("success");
+    alert(`✅ Курс сохранён: 1 ¥ = ${rate} ₽`);
+  } catch (e) {
+    alert("❌ Ошибка: " + e.message);
+  }
+};
+
+// ---------- Найти заказ ----------
+document.getElementById("btn-search-order").onclick = async () => {
+  const id = parseInt(document.getElementById("search-order-id").value, 10);
+  if (!id) return alert("Введи номер заказа");
+  try {
+    await openOrderModal(id, true);
+    document.getElementById("search-order-id").value = "";
+  } catch (e) {
+    alert("❌ " + e.message);
+  }
+};
+
+// ---------- Начислить баллы ----------
+document.getElementById("btn-award").onclick = async () => {
+  const user_id = parseInt(document.getElementById("bonus-user").value, 10);
+  const amount = parseInt(document.getElementById("bonus-amount").value, 10);
+  const reason = document.getElementById("bonus-reason").value || "manual";
+  if (!amount) return alert("Укажи количество баллов");
+  try {
+    await api("/api/admin/award", {
+      method: "POST",
+      body: JSON.stringify({ user_id, amount, reason }),
+    });
+    document.getElementById("bonus-amount").value = "";
+    document.getElementById("bonus-reason").value = "";
+    tg?.HapticFeedback?.notificationOccurred("success");
+    alert("✅ Начислено");
+    loadAdmin();
+  } catch (e) {
+    alert("❌ Ошибка: " + e.message);
+  }
+};
+
+// ---------- Создание заказа ----------
+let productIndex = 0;
+
+function addProductRow() {
+  productIndex++;
+  const html = `
+    <div class="product-row" data-idx="${productIndex}">
+      <div class="product-grid">
+        <input type="text" class="p-title boxed-input" placeholder="Название товара">
+        <input type="text" class="p-url boxed-input" placeholder="Ссылка на Poizon">
+        <input type="text" class="p-photo boxed-input" placeholder="Ссылка на фото">
+        <div class="two-col">
+          <input type="number" class="p-price boxed-input" placeholder="Цена, ¥" step="0.01">
+          <input type="number" class="p-qty boxed-input" placeholder="Кол-во" value="1" min="1">
         </div>
-    </section>
+      </div>
+      <button class="remove-btn" onclick="this.parentElement.remove()">Удалить товар</button>
+    </div>
+  `;
+  document.getElementById("order-products").insertAdjacentHTML("beforeend", html);
+}
 
-    <section class="platforms" id="platforms">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">Площадки</span>
-                <h2 class="section-title">С какими площадками работаем</h2>
-                <p class="section-subtitle">Пошаговые инструкции — на отдельной странице</p>
-            </div>
+document.getElementById("btn-add-product").onclick = addProductRow;
 
-            <div class="platforms__grid">
-                <a href="instructions.html#poizon" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">Poizon / Dewu</h3>
-                    <p class="platform-card__desc">Кроссовки, одежда, брендовые вещи из Китая</p>
-                    <span class="platform-card__link">Инструкция →</span>
-                </a>
-                <a href="instructions.html#taobao" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">Taobao</h3>
-                    <p class="platform-card__desc">Миллионы товаров от китайских производителей</p>
-                    <span class="platform-card__link">Инструкция →</span>
-                </a>
-                <a href="instructions.html#1688" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">1688</h3>
-                    <p class="platform-card__desc">Оптовая площадка для крупных закупок</p>
-                    <span class="platform-card__link">Инструкция →</span>
-                </a>
-                <a href="instructions.html#pinduoduo" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">Pinduoduo</h3>
-                    <p class="platform-card__desc">Дешёвые товары и групповые покупки</p>
-                    <span class="platform-card__link">Инструкция →</span>
-                </a>
-                <a href="instructions.html#95" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">95 (95fenapp)</h3>
-                    <p class="platform-card__desc">Молодёжная площадка, вход через Dewu</p>
-                    <span class="platform-card__link">Инструкция →</span>
-                </a>
-                <a href="instructions.html" class="platform-card">
-                    <span class="platform-card__icon">◈</span>
-                    <h3 class="platform-card__title">Все инструкции</h3>
-                    <p class="platform-card__desc">Пошаговые гайды по всем площадкам</p>
-                    <span class="platform-card__link">Открыть →</span>
-                </a>
-            </div>
-        </div>
-    </section>
+document.getElementById("btn-create-order").onclick = async () => {
+  const user_id = parseInt(document.getElementById("order-user").value, 10);
+  const commission = parseFloat(document.getElementById("order-commission").value) || 550;
+  const delivery = parseFloat(document.getElementById("order-delivery").value) || 599;
 
-    <section class="contacts" id="contacts">
-        <div class="container">
-            <div class="contacts__grid">
-                <div class="contacts__info">
-                    <span class="section-tag">Контакты</span>
-                    <h2 class="section-title section-title--left">Свяжитесь с нами</h2>
-                    <p class="contacts__desc">Ответим на вопросы и рассчитаем индивидуальные условия</p>
+  const products = [];
+  document.querySelectorAll("#order-products .product-row").forEach((row) => {
+    const title = row.querySelector(".p-title").value.trim();
+    const url = row.querySelector(".p-url").value.trim();
+    const photo_url = row.querySelector(".p-photo").value.trim();
+    const price_cny = parseFloat(row.querySelector(".p-price").value);
+    const quantity = parseInt(row.querySelector(".p-qty").value) || 1;
+    if (!title || !price_cny) return;
+    products.push({ title, url, photo_url, price_cny, quantity });
+  });
 
-                    <div class="contacts__list">
-                        <a href="tel:+79146755735" class="contacts__item">
-                            <span class="contacts__item-icon">◈</span>
-                            <div>
-                                <span class="contacts__item-label">Телефон</span>
-                                <span class="contacts__item-value">+7 914 675-57-35</span>
-                            </div>
-                        </a>
-                        <a href="https://t.me/kuzz767" target="_blank" class="contacts__item">
-                            <span class="contacts__item-icon">◈</span>
-                            <div>
-                                <span class="contacts__item-label">Telegram</span>
-                                <span class="contacts__item-value">@kuzz767</span>
-                            </div>
-                        </a>
-                        <a href="mailto:admin@pacificstyle.ru" class="contacts__item">
-                            <span class="contacts__item-icon">◈</span>
-                            <div>
-                                <span class="contacts__item-label">Email</span>
-                                <span class="contacts__item-value">admin@pacificstyle.ru</span>
-                            </div>
-                        </a>
-                    </div>
-                </div>
+  if (!products.length) return alert("Добавь хотя бы один товар с названием и ценой");
 
-                <div class="contacts__card">
-                    <h3 class="contacts__card-title">Оставьте заявку</h3>
-                    <p class="contacts__card-desc">Мы свяжемся с вами в течение 15 минут</p>
-                    <a href="https://t.me/kuzz767" target="_blank" class="btn btn--primary btn--full">
-                        Написать в Telegram
-                    </a>
-                    <a href="tel:+79146755735" class="btn btn--ghost btn--full" style="margin-top: 12px;">
-                        Позвонить
-                    </a>
-                    <a href="mailto:admin@pacificstyle.ru" class="btn btn--ghost btn--full" style="margin-top: 12px;">
-                        Написать на почту
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
+  try {
+    const res = await api("/api/admin/create_order", {
+      method: "POST",
+      body: JSON.stringify({ user_id, products, commission, delivery }),
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    alert(`✅ Заказ №${res.order_id} создан.\n\nСумма: ${Math.round(res.total_rub)} ₽`);
+    document.getElementById("order-products").innerHTML = "";
+    productIndex = 0;
+    addProductRow();
+    loadAdmin();
+  } catch (e) {
+    alert("❌ Ошибка: " + e.message);
+  }
+};
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer__inner">
-                <span class="footer__logo">
-                    <span class="nav__logo-icon">◈</span>
-                    Pacific <span class="nav__logo-accent">Style</span>
-                </span>
-                <p class="footer__copy">© 2026 Pacific Style. Доставка из Китая, Запада и США.</p>
-            </div>
-        </div>
-    </footer>
+// ---------- Init ----------
+document.getElementById("modal").addEventListener("click", (e) => {
+  if (e.target.id === "modal") closeModal();
+});
 
-    <script>
-        (function () {
-            'use strict';
-
-            const CONFIG = {
-                delivery: 599,
-                commission: 550,
-                locale: 'ru-RU'
-            };
-
-            const DATA_JSON_BASE = 'https://raw.githubusercontent.com/kuzz767/pacificstyle/main/data.json';
-            const REFRESH_INTERVAL = 30000;
-
-            const priceInput = document.getElementById('priceCny');
-            const calcBtn = document.getElementById('calcBtn');
-            const resultBlock = document.getElementById('result');
-            const resultPriceRub = document.getElementById('resultPriceRub');
-            const resultDelivery = document.getElementById('resultDelivery');
-            const resultCommission = document.getElementById('resultCommission');
-            const resultTotal = document.getElementById('resultTotal');
-            const rateValue = document.getElementById('rateValue');
-            const nav = document.getElementById('nav');
-
-            let currentRate = null;
-            let lastRateRaw = null;
-
-            function formatRub(value) {
-                return new Intl.NumberFormat(CONFIG.locale, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                }).format(value) + ' ₽';
-            }
-
-            function formatRate(value) {
-                return new Intl.NumberFormat(CONFIG.locale, {
-                    minimumFractionDigits: 4,
-                    maximumFractionDigits: 4
-                }).format(value) + ' ₽/¥';
-            }
-
-            async function fetchDataJson() {
-                try {
-                    const url = DATA_JSON_BASE + '?t=' + Date.now();
-                    const res = await fetch(url, { cache: 'no-store' });
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-                    const data = await res.json();
-
-                    if (typeof data.delivery === 'number' && data.delivery > 0) {
-                        CONFIG.delivery = data.delivery;
-                    }
-                    if (typeof data.commission === 'number' && data.commission >= 0) {
-                        CONFIG.commission = data.commission;
-                    }
-
-                    if (typeof data.cny_rate === 'number' && data.cny_rate > 0) {
-                        return data.cny_rate;
-                    }
-
-                    console.warn('data.json: поле cny_rate отсутствует или некорректно');
-                    return null;
-                } catch (e) {
-                    console.warn('Не удалось загрузить data.json:', e);
-                    return null;
-                }
-            }
-
-            function animateTotal(target) {
-                const duration = 700;
-                const start = performance.now();
-                function tick(now) {
-                    const progress = Math.min((now - start) / duration, 1);
-                    const eased = 1 - Math.pow(1 - progress, 3);
-                    resultTotal.textContent = formatRub(target * eased);
-                    if (progress < 1) requestAnimationFrame(tick);
-                    else resultTotal.textContent = formatRub(target);
-                }
-                requestAnimationFrame(tick);
-            }
-
-            function calculate() {
-                const priceCny = parseFloat(priceInput.value);
-                if (isNaN(priceCny) || priceCny <= 0) {
-                    priceInput.focus();
-                    priceInput.style.borderColor = '#ef4444';
-                    setTimeout(() => { priceInput.style.borderColor = ''; }, 1500);
-                    return;
-                }
-
-                if (currentRate === null) {
-                    rateValue.textContent = 'курс недоступен';
-                    return;
-                }
-
-                const priceRub = priceCny * currentRate;
-                const total = priceRub + CONFIG.delivery + CONFIG.commission;
-
-                resultPriceRub.textContent = formatRub(priceRub);
-                resultDelivery.textContent = CONFIG.delivery + ' ₽ (за кг)';
-                resultCommission.textContent = CONFIG.commission + ' ₽';
-
-                resultBlock.classList.remove('visible');
-                void resultBlock.offsetWidth;
-                resultBlock.classList.add('visible');
-
-                animateTotal(total);
-            }
-
-            async function refreshRate() {
-                const newRate = await fetchDataJson();
-
-                if (newRate === null) {
-                    if (currentRate === null) {
-                        rateValue.textContent = 'курс недоступен';
-                    }
-                    return;
-                }
-
-                if (newRate !== lastRateRaw) {
-                    lastRateRaw = newRate;
-                    currentRate = newRate;
-                    rateValue.textContent = formatRate(newRate);
-
-                    if (resultBlock.classList.contains('visible')) {
-                        calculate();
-                    }
-                }
-            }
-
-            calcBtn.addEventListener('click', calculate);
-            priceInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') calculate(); });
-            priceInput.addEventListener('input', () => {
-                if (resultBlock.classList.contains('visible')) calculate();
-            });
-
-            window.addEventListener('scroll', () => {
-                if (window.scrollY > 20) nav.classList.add('nav--scrolled');
-                else nav.classList.remove('nav--scrolled');
-            }, { passive: true });
-
-            (async function init() {
-                await refreshRate();
-                if (priceInput.value) calculate();
-            })();
-
-            setInterval(refreshRate, REFRESH_INTERVAL);
-        })();
-    </script>
+(async () => {
+  await loadMe();
+  await loadRate();
+  await loadOrders();
+  if (ME?.is_admin) {
+    await loadAdmin();
+    addProductRow();
+  }
+})();
+</script>
 </body>
 </html>
