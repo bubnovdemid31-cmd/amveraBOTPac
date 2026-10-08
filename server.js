@@ -5,7 +5,7 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const { Telegraf } = require("telegraf");
-const { DatabaseSync } = require("node:sqlite");
+const Database = require("better-sqlite3");
 
 // ============== КОНФИГ ==============
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -16,16 +16,25 @@ const ADMIN_IDS = (process.env.ADMIN_IDS || "")
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const WEBAPP_URL = process.env.WEBAPP_URL || `http://localhost:${PORT}`;
 const CNY_RATE_DEFAULT = parseFloat(process.env.CNY_RATE_DEFAULT || "12.5");
-const DELIVERY_PRICE = parseFloat(process.env.DELIVERY_PRICE || "600");
+const DELIVERY_PRICE = parseFloat(process.env.DELIVERY_PRICE || "599");
 const COMMISSION_PRICE = parseFloat(process.env.COMMISSION_PRICE || "550");
 
+// Путь к БД — на Amvera /data/poizon.db, локально ./poizon.db
+const DB_PATH = process.env.DB_PATH || "./poizon.db";
+
 if (!BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN не задан в .env");
+  console.error("❌ BOT_TOKEN не задан в переменных окружения");
   process.exit(1);
 }
 
+console.log("🚀 Запуск Pacific Style Bot");
+console.log(`📂 База данных: ${DB_PATH}`);
+console.log(`🌐 Mini App URL: ${WEBAPP_URL}`);
+
 // ============== БАЗА ДАННЫХ ==============
-const db = new DatabaseSync("poizon.db");
+const db = new Database(DB_PATH);
+db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = ON");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -50,7 +59,7 @@ db.exec(`
     user_id INTEGER NOT NULL,
     status TEXT DEFAULT 'created',
     commission REAL DEFAULT 550,
-    delivery REAL DEFAULT 600,
+    delivery REAL DEFAULT 599,
     cny_rate REAL DEFAULT 12.5,
     total_rub REAL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
@@ -88,12 +97,14 @@ db.exec(`
   );
 `);
 
+// Курс по умолчанию
 const rateRow = db.prepare("SELECT value FROM settings WHERE key = 'cny_rate'").get();
 if (!rateRow) {
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
     "cny_rate",
     String(CNY_RATE_DEFAULT)
   );
+  console.log(`💱 Установлен курс по умолчанию: ${CNY_RATE_DEFAULT}`);
 }
 
 // ============== ХЕЛПЕРЫ БД ==============
@@ -171,26 +182,13 @@ function verifyInitData(initData) {
   return JSON.parse(userJson);
 }
 
-// ============== УВЕДОМЛЕНИЯ ==============
-async function notifyUser(telegramId, text) {
-  try {
-    await bot.telegram.sendMessage(telegramId, text, { parse_mode: "HTML" });
-  } catch (e) {
-    console.error("Не удалось отправить уведомление:", e.message);
-  }
-}
-
-const STATUS_LABELS = {
-  created: "🛒 Оформлен",
-  cn_warehouse: "📦 На складе в Китае",
-  in_transit: "✈️ В пути в ваш город",
-  delivered: "🚚 Доставлен",
-  closed: "✅ Завершён",
-};
-
 // ============== БОТ ==============
 const bot = new Telegraf(BOT_TOKEN);
 
+const BRAND = `<b>Pacific Style</b>`;
+const DIVIDER = `━━━━━━━━━━━━━━━━━━━━`;
+
+// ---------- /start ----------
 bot.start(async (ctx) => {
   const tg = ctx.from;
   const payload = ctx.startPayload;
@@ -217,6 +215,7 @@ bot.start(async (ctx) => {
     if (referredBy) {
       q.createReferral.run(referredBy, tg.id);
     }
+    console.log(`👤 Новый пользователь: ${tg.first_name} (${tg.id})`);
   } else if (isAdmin && !user.is_admin) {
     q.setAdmin.run(1, user.id);
     user.is_admin = 1;
@@ -224,42 +223,100 @@ bot.start(async (ctx) => {
 
   const greeting =
     `👋 Привет, <b>${user.first_name}</b>!\n\n` +
-    `📦 Это сервис доставки вещей с Poizon.\n\n` +
-    `🧮 Калькулятор стоимости\n` +
-    `📋 Ваши заказы и история\n` +
-    `🎁 Бонусные баллы за заказы и друзей\n\n` +
-    `Нажми кнопку ниже, чтобы открыть магазин 👇`;
+    `Добро пожаловать в ${BRAND} — сервис доставки товаров\n` +
+    `из <b>Китая</b>, <b>США</b> и стран <b>Запада</b>.\n\n` +
+    `${DIVIDER}\n` +
+    `🧮 <b>Что вы можете здесь:</b>\n\n` +
+    `• Рассчитать стоимость товара в калькуляторе\n` +
+    `• Оформить и отслеживать заказы\n` +
+    `• Следить за статусами доставки\n` +
+    `• Копить бонусные баллы\n` +
+    `• Приглашать друзей и получать +200 баллов\n` +
+    `${DIVIDER}\n\n` +
+    `📌 Доставка рассчитывается <b>по весу</b> и оплачивается\n` +
+    `перед отправкой со склада в Китае.\n\n` +
+    `Нажмите кнопку ниже 👇`;
 
   await ctx.replyWithHTML(greeting, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "🛍 Открыть магазин", web_app: { url: WEBAPP_URL } }],
+        [{ text: "🛍 Открыть Pacific Style", web_app: { url: WEBAPP_URL } }],
       ],
     },
   });
 });
 
+// ---------- /me ----------
 bot.command("me", async (ctx) => {
   const user = q.getUser.get(ctx.from.id);
-  if (!user) return ctx.reply("Сначала нажми /start");
+  if (!user) {
+    return ctx.replyWithHTML(
+      `Сначала нажмите /start, чтобы зарегистрироваться.`
+    );
+  }
+  const status = user.is_admin ? "✅ Администратор" : "Клиент";
   await ctx.replyWithHTML(
-    `👤 <b>Профиль</b>\n\n` +
-      `Имя: ${user.first_name}\n` +
-      `Username: @${user.username || "—"}\n` +
-      `Телефон: ${user.phone || "—"}\n` +
-      `🎁 Баллы: <b>${user.bonus_points}</b>\n` +
-      `🛡 Админ: ${user.is_admin ? "✅" : "❌"}`
+    `👤 <b>Ваш профиль</b>\n\n` +
+      `${DIVIDER}\n` +
+      `<b>Имя:</b> ${user.first_name}\n` +
+      `<b>Username:</b> @${user.username || "—"}\n` +
+      `<b>Телефон:</b> ${user.phone || "не указан"}\n` +
+      `<b>Статус:</b> ${status}\n` +
+      `${DIVIDER}\n\n` +
+      `🎁 <b>Бонусные баллы:</b> ${user.bonus_points}\n\n` +
+      `1 балл = 1 ₽ скидки на комиссию.`
   );
 });
 
+// ---------- /help ----------
+bot.command("help", async (ctx) => {
+  await ctx.replyWithHTML(
+    `❓ <b>Справка ${BRAND}</b>\n\n` +
+      `${DIVIDER}\n` +
+      `<b>Команды:</b>\n\n` +
+      `/start — главное меню\n` +
+      `/me — ваш профиль и баллы\n` +
+      `/ref — реферальная ссылка\n` +
+      `/help — эта справка\n` +
+      `${DIVIDER}\n\n` +
+      `💬 По всем вопросам: @kuzz767\n` +
+      `📞 Телефон: +7 914 675-57-35`
+  );
+});
+
+// ---------- /ref ----------
 bot.command("ref", async (ctx) => {
   const me = await bot.telegram.getMe();
   const link = `https://t.me/${me.username}?start=ref_${ctx.from.id}`;
   await ctx.replyWithHTML(
-    `🔗 <b>Твоя реферальная ссылка:</b>\n\n<code>${link}</code>\n\n` +
-      `За каждого друга, который сделает заказ — <b>+200 баллов</b>.`
+    `🔗 <b>Ваша реферальная ссылка</b>\n\n` +
+      `${DIVIDER}\n` +
+      `<code>${link}</code>\n` +
+      `${DIVIDER}\n\n` +
+      `👥 Приглашайте друзей и получайте:\n\n` +
+      `• <b>+200 баллов</b> за каждого друга,\n` +
+      `  который сделает заказ\n\n` +
+      `🎁 Баллы можно тратить на скидку\n` +
+      `по комиссии ваших заказов.`
   );
 });
+
+// ============== УВЕДОМЛЕНИЯ ==============
+async function notifyUser(telegramId, text) {
+  try {
+    await bot.telegram.sendMessage(telegramId, text, { parse_mode: "HTML" });
+  } catch (e) {
+    console.error(`Не удалось отправить уведомление ${telegramId}:`, e.message);
+  }
+}
+
+const STATUS_LABELS = {
+  created: "🛒 Оформлен",
+  cn_warehouse: "📦 На складе в Китае",
+  in_transit: "✈️ В пути в ваш город",
+  delivered: "🚚 Доставлен",
+  closed: "✅ Завершён",
+};
 
 // ============== EXPRESS ==============
 const app = express();
@@ -272,7 +329,7 @@ function authMiddleware(req, res, next) {
     const tgUser = verifyInitData(initData);
     const user = q.getUser.get(tgUser.id);
     if (!user)
-      return res.status(404).json({ error: "Пользователь не найден. Нажми /start в боте." });
+      return res.status(404).json({ error: "Пользователь не найден. Нажмите /start в боте." });
     req.user = user;
     next();
   } catch (e) {
@@ -281,7 +338,7 @@ function authMiddleware(req, res, next) {
 }
 
 function adminMiddleware(req, res, next) {
-  if (!req.user?.is_admin) return res.status(403).json({ error: "Только для админов" });
+  if (!req.user?.is_admin) return res.status(403).json({ error: "Только для администраторов" });
   next();
 }
 
@@ -313,7 +370,6 @@ app.get("/api/orders", authMiddleware, (req, res) => {
   res.json(withProducts);
 });
 
-// Заказ по ID (для модалки) — владелец или админ
 app.get("/api/order/:id", authMiddleware, (req, res) => {
   const orderId = parseInt(req.params.id, 10);
   const order = q.orderById.get(orderId);
@@ -366,7 +422,12 @@ app.post("/api/admin/award", authMiddleware, adminMiddleware, async (req, res) =
 
   await notifyUser(
     user.telegram_id,
-    `🎁 Вам начислено <b>${amount}</b> баллов!\n\nПричина: ${reason || "начисление"}`
+    `🎁 <b>Вам начислены бонусные баллы!</b>\n\n` +
+      `${DIVIDER}\n` +
+      `<b>Начислено:</b> +${amount} баллов\n` +
+      `<b>Причина:</b> ${reason || "начисление"}\n` +
+      `${DIVIDER}\n\n` +
+      `Спасибо, что выбираете ${BRAND} 💙`
   );
 
   res.json({ ok: true });
@@ -384,7 +445,7 @@ app.post("/api/admin/set_admin", authMiddleware, adminMiddleware, async (req, re
   await notifyUser(
     target.telegram_id,
     is_admin
-      ? `🛡 Вам выданы права администратора.`
+      ? `🛡 <b>Вам выданы права администратора</b>\n\nТеперь вам доступна админ-панель в приложении.`
       : `ℹ️ Ваши права администратора сняты.`
   );
 
@@ -423,15 +484,21 @@ app.post("/api/admin/create_order", authMiddleware, adminMiddleware, async (req,
   await notifyUser(
     user.telegram_id,
     `🛒 <b>Ваш заказ №${orderId} оформлен!</b>\n\n` +
-      `Товаров: ${products.length}\n` +
-      `Итого: <b>${Math.round(totalRub)} ₽</b>\n\n` +
-      `📌 Стоимость доставки указана предварительно и будет уточнена после прибытия товара на склад в Китае.`
+      `${DIVIDER}\n` +
+      `<b>Товаров:</b> ${products.length}\n` +
+      `<b>Сумма товаров:</b> ${Math.round(productsSum * rate)} ₽\n` +
+      `<b>Комиссия:</b> ${Math.round(comm)} ₽\n` +
+      `<b>Доставка (предв.):</b> ${Math.round(deliv)} ₽\n` +
+      `${DIVIDER}\n` +
+      `<b>Итого:</b> ${Math.round(totalRub)} ₽\n\n` +
+      `📌 Стоимость доставки указана предварительно и будет уточнена после взвешивания на складе в Китае.\n\n` +
+      `Отследить статус заказа можно в приложении.`
   );
 
+  console.log(`📦 Создан заказ №${orderId} для ${user.first_name}`);
   res.json({ ok: true, order_id: orderId, total_rub: totalRub });
 });
 
-// Обновление стоимости доставки
 app.post("/api/admin/order/:id/delivery", authMiddleware, adminMiddleware, async (req, res) => {
   const orderId = parseInt(req.params.id, 10);
   const { delivery } = req.body;
@@ -452,9 +519,13 @@ app.post("/api/admin/order/:id/delivery", authMiddleware, adminMiddleware, async
   if (user) {
     await notifyUser(
       user.telegram_id,
-      `📦 <b>Заказ №${orderId}</b>\n\n` +
-        `Стоимость доставки уточнена: <b>${Math.round(delivery)} ₽</b>\n\n` +
-        `Итого к оплате: <b>${Math.round(totalRub)} ₽</b>`
+      `📦 <b>Заказ №${orderId} — обновление</b>\n\n` +
+        `${DIVIDER}\n` +
+        `<b>Стоимость доставки уточнена:</b>\n` +
+        `${Math.round(delivery)} ₽\n\n` +
+        `<b>Итого к оплате:</b> ${Math.round(totalRub)} ₽\n` +
+        `${DIVIDER}\n\n` +
+        `Проверьте детали в приложении.`
     );
   }
 
@@ -476,19 +547,32 @@ app.post("/api/admin/order/:id/status", authMiddleware, adminMiddleware, async (
   const user = q.getUserById.get(order.user_id);
   if (user) {
     let extra = "";
+
     if (status === "cn_warehouse") {
       extra =
-        `\n\n💰 <b>Товар прибыл на склад в Китае.</b>\n` +
+        `\n\n💰 <b>Что дальше:</b>\n` +
+        `Товар прибыл на склад в Китае.\n` +
         `Теперь необходимо оплатить доставку.\n\n` +
-        `Стоимость доставки указана в вашем заказе. ` +
-        `Администратор может уточнить её после взвешивания.`;
+        `Точная стоимость доставки будет указана в вашем заказе после взвешивания.`;
+    } else if (status === "in_transit") {
+      extra = `\n\n🚚 Товар отправлен из Китая в ваш город.`;
+    } else if (status === "delivered") {
+      extra = `\n\n✅ Товар доставлен. Спасибо, что выбрали ${BRAND}!`;
+    } else if (status === "closed") {
+      extra = `\n\n🎁 Заказ закрыт. Начислено +50 баллов!`;
     }
+
     await notifyUser(
       user.telegram_id,
-      `📦 <b>Заказ №${orderId}</b>\n\nНовый статус: <b>${STATUS_LABELS[status]}</b>${extra}`
+      `📦 <b>Заказ №${orderId}</b>\n\n` +
+        `${DIVIDER}\n` +
+        `<b>Новый статус:</b>\n${STATUS_LABELS[status]}\n` +
+        `${DIVIDER}` +
+        extra
     );
   }
 
+  console.log(`📦 Заказ №${orderId}: ${status}`);
   res.json({ ok: true });
 });
 
@@ -497,9 +581,10 @@ app.get("/api/health", (req, res) => {
 });
 
 // ============== ЗАПУСК ==============
-app.listen(PORT, () => {
-  console.log(`🌐 Сервер: http://localhost:${PORT}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🌐 Сервер: http://0.0.0.0:${PORT}`);
   console.log(`🤖 Mini App URL: ${WEBAPP_URL}`);
+  console.log(`✅ Pacific Style готов к работе`);
 });
 
 bot
@@ -507,5 +592,16 @@ bot
   .then(() => console.log("🤖 Бот запущен"))
   .catch((e) => console.error("Ошибка запуска бота:", e));
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+// Корректное завершение
+async function shutdown(signal) {
+  console.log(`\n${signal} получен, завершение...`);
+  try { bot.stop(signal); } catch (e) {}
+  server.close(() => {
+    console.log("Сервер остановлен");
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 5000);
+}
+
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
