@@ -2,7 +2,7 @@ meta:
   environment: node
   toolchain:
     name: npm
-    version: 24
+    version: 20
 
 build:
   additionalCommands:
