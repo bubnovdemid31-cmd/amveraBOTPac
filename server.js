@@ -19,7 +19,6 @@ const CNY_RATE_DEFAULT = parseFloat(process.env.CNY_RATE_DEFAULT || "12.5");
 const DELIVERY_PRICE = parseFloat(process.env.DELIVERY_PRICE || "599");
 const COMMISSION_PRICE = parseFloat(process.env.COMMISSION_PRICE || "550");
 
-// Путь к БД — на Amvera /data/poizon.db, локально ./poizon.db
 const DB_PATH = process.env.DB_PATH || "./poizon.db";
 
 if (!BOT_TOKEN) {
@@ -228,13 +227,15 @@ bot.start(async (ctx) => {
     `${DIVIDER}\n` +
     `🧮 <b>Что вы можете здесь:</b>\n\n` +
     `• Рассчитать стоимость товара в калькуляторе\n` +
-    `• Оформить и отслеживать заказы\n` +
+    `• Отслеживать уже оформленные заказы\n` +
     `• Следить за статусами доставки\n` +
     `• Копить бонусные баллы\n` +
     `• Приглашать друзей и получать +200 баллов\n` +
     `${DIVIDER}\n\n` +
     `📌 Доставка рассчитывается <b>по весу</b> и оплачивается\n` +
     `перед отправкой со склада в Китае.\n\n` +
+    `💬 По всем вопросам: @kuzz767\n` +
+    `📧 admin@pacificstyle.ru\n\n` +
     `Нажмите кнопку ниже 👇`;
 
   await ctx.replyWithHTML(greeting, {
@@ -279,7 +280,8 @@ bot.command("help", async (ctx) => {
       `/ref — реферальная ссылка\n` +
       `/help — эта справка\n` +
       `${DIVIDER}\n\n` +
-      `💬 По всем вопросам: @kuzz767\n` +
+      `💬 Telegram: @kuzz767\n` +
+      `📧 Email: admin@pacificstyle.ru\n` +
       `📞 Телефон: +7 914 675-57-35`
   );
 });
@@ -491,7 +493,7 @@ app.post("/api/admin/create_order", authMiddleware, adminMiddleware, async (req,
       `<b>Доставка (предв.):</b> ${Math.round(deliv)} ₽\n` +
       `${DIVIDER}\n` +
       `<b>Итого:</b> ${Math.round(totalRub)} ₽\n\n` +
-      `📌 Стоимость доставки указана предварительно и будет уточнена после взвешивания на складе в Китае.\n\n` +
+      `📌 Стоимость доставки указана предварительно и будет подсчитана после взвешивания на складе в Китае.\n\n` +
       `Отследить статус заказа можно в приложении.`
   );
 
@@ -521,7 +523,7 @@ app.post("/api/admin/order/:id/delivery", authMiddleware, adminMiddleware, async
       user.telegram_id,
       `📦 <b>Заказ №${orderId} — обновление</b>\n\n` +
         `${DIVIDER}\n` +
-        `<b>Стоимость доставки уточнена:</b>\n` +
+        `<b>Стоимость доставки подсчитана:</b>\n` +
         `${Math.round(delivery)} ₽\n\n` +
         `<b>Итого к оплате:</b> ${Math.round(totalRub)} ₽\n` +
         `${DIVIDER}\n\n` +
@@ -592,7 +594,6 @@ bot
   .then(() => console.log("🤖 Бот запущен"))
   .catch((e) => console.error("Ошибка запуска бота:", e));
 
-// Корректное завершение
 async function shutdown(signal) {
   console.log(`\n${signal} получен, завершение...`);
   try { bot.stop(signal); } catch (e) {}
