@@ -96,7 +96,6 @@ db.exec(`
   );
 `);
 
-// Курс по умолчанию
 const rateRow = db.prepare("SELECT value FROM settings WHERE key = 'cny_rate'").get();
 if (!rateRow) {
   db.prepare("INSERT INTO settings (key, value) VALUES (?, ?)").run(
