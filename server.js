@@ -389,6 +389,37 @@ app.get("/api/bonus", authMiddleware, (req, res) => {
   });
 });
 
+// ---------- ЗАЯВКА ИЗ КАТАЛОГА ----------
+app.post("/api/catalog/order", authMiddleware, async (req, res) => {
+  const { product_id, title, price, size, players } = req.body;
+  if (!title) return res.status(400).json({ error: "Не хватает данных" });
+
+  const u = req.user;
+  const username = u.username ? `@${u.username}` : `${u.first_name} (ID: ${u.telegram_id})`;
+
+  const msg =
+    `🛒 <b>Новая заявка из каталога!</b>\n\n` +
+    `${DIVIDER}\n` +
+    `<b>Пользователь:</b> ${username}\n` +
+    `<b>Товар:</b> ${title}\n` +
+    `<b>Размер:</b> ${size || "—"}\n` +
+    `${players && players.length ? `<b>Игрок:</b> ${players.join(", ")}\n` : ""}` +
+    `<b>Цена:</b> ${Math.round(price)} ₽\n` +
+    `${DIVIDER}\n\n` +
+    `Свяжитесь с клиентом для оформления.`;
+
+  for (const adminTgId of ADMIN_IDS) {
+    try {
+      await bot.telegram.sendMessage(adminTgId, msg, { parse_mode: "HTML" });
+    } catch (e) {
+      console.error(`Не удалось отправить заявку админу ${adminTgId}:`, e.message);
+    }
+  }
+
+  console.log(`🛒 Заявка из каталога: ${username} → ${title}`);
+  res.json({ ok: true });
+});
+
 // ---------- АДМИН ----------
 
 app.get("/api/admin/users", authMiddleware, adminMiddleware, (req, res) => {
