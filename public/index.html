@@ -714,6 +714,9 @@ const STATUS_LABELS = {
 };
 
 // ========== КАТАЛОГ: ДАННЫЕ ==========
+// Если фото лежат в папке public/catalog/ — оставь пути "catalog/product1.jpg"
+// Если фото лежат на GitHub Pages — замени на полные URL:
+// "https://bubnovdemid31-cmd.github.io/pacificstyle/catalog/product1.jpg"
 const CATALOG_PRODUCTS = [
   {
     id: 1,
@@ -860,7 +863,6 @@ function openCatalogProduct(id) {
     playersBlock.innerHTML = "";
   }
 
-  // Галерея
   const track = document.getElementById("catalog-track");
   const dots = document.getElementById("catalog-dots");
   const prevBtn = document.getElementById("cat-prev");
@@ -920,7 +922,6 @@ function closeCatalogModal() {
   catSlide = 0;
 }
 
-// Свайпы
 const catGallery = document.getElementById("catalog-gallery");
 catGallery.addEventListener("touchstart", (e) => {
   catTouchStart = e.changedTouches[0].screenX;
@@ -933,7 +934,7 @@ catGallery.addEventListener("touchend", (e) => {
   }
 }, { passive: true });
 
-// ---------- ОФОРМЛЕНИЕ ЗАКАЗА ИЗ КАТАЛОГА ----------
+// ---------- ОФОРМЛЕНИЕ ИЗ КАТАЛОГА ----------
 async function orderFromCatalog() {
   if (!catProduct) return;
   const btn = document.getElementById("catalog-order-btn");
@@ -963,7 +964,7 @@ async function orderFromCatalog() {
   }
 }
 
-// ---------- Заказы пользователя ----------
+// ---------- Заказы ----------
 async function loadOrders() {
   try {
     const list = await api("/api/orders");
@@ -1106,7 +1107,6 @@ async function openOrderModal(orderId, adminView = false) {
     const order = await api(`/api/order/${orderId}`);
     const isClosed = order.status === "closed";
     const isCnWarehouse = order.status === "cn_warehouse";
-    const statusClass = isClosed ? "closed" : (isCnWarehouse ? "warn" : "");
 
     const productsHtml = order.products.map((p) => `
       <div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;">
