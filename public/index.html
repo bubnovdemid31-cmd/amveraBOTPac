@@ -130,6 +130,7 @@
   }
   button.primary:hover { background: var(--blue-bright); }
   button.primary:active { transform: scale(0.985); }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
   button.small {
     padding: 8px 12px; font-size: 12px; font-weight: 600; border-radius: 7px;
     border: 1px dashed var(--border); background: transparent;
@@ -183,20 +184,20 @@
   .badge-btn:hover { border-color: var(--blue); color: var(--white); }
   .badge-btn.danger:hover { border-color: var(--red); color: var(--red); }
 
-  .product-row {
+  .product-row-form {
     border: 1px solid var(--border); border-radius: 9px;
     padding: 10px; margin: 0 14px 10px; background: var(--black-soft);
   }
-  .product-row:first-of-type { margin-top: 10px; }
+  .product-row-form:first-of-type { margin-top: 10px; }
   .product-grid { display: grid; grid-template-columns: 1fr; gap: 6px; }
   .product-grid .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .product-row .remove-btn {
+  .product-row-form .remove-btn {
     background: transparent; color: var(--red); border: none;
     padding: 6px 0 0; font-size: 11.5px; font-weight: 600; cursor: pointer;
     font-family: var(--font); text-align: left;
   }
 
-  /* ========== ФУТЕР С КОНТАКТАМИ (внизу каждой вкладки) ========== */
+  /* ========== ФУТЕР С КОНТАКТАМИ ========== */
   .contacts-footer {
     margin-top: 20px;
     padding: 16px 14px;
@@ -234,65 +235,230 @@
     font-size: 13px; font-weight: 600; color: var(--blue-bright);
   }
 
-  /* ---------- МОДАЛКА ЗАКАЗА ---------- */
+  /* ========== КАТАЛОГ ========== */
+  .catalog-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .catalog-card {
+    background: var(--black-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex; flex-direction: column;
+  }
+  .catalog-card:hover { border-color: rgba(59,130,246,0.4); }
+  .catalog-card:active { transform: scale(0.98); }
+  .catalog-card__image-wrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: var(--black-soft);
+  }
+  .catalog-card__image {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .catalog-card__badge {
+    position: absolute; top: 8px; left: 8px;
+    padding: 3px 8px;
+    background: var(--blue); color: var(--white);
+    border-radius: 100px;
+    font-size: 9.5px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .catalog-card__photos {
+    position: absolute; top: 8px; right: 8px;
+    padding: 3px 7px;
+    background: rgba(0,0,0,0.6); color: var(--white);
+    border-radius: 100px;
+    font-size: 9.5px; font-weight: 600;
+    backdrop-filter: blur(10px);
+  }
+  .catalog-card__body { padding: 10px 11px 12px; }
+  .catalog-card__title {
+    font-size: 12px; font-weight: 700; line-height: 1.3;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .catalog-card__size {
+    font-size: 10.5px; color: var(--white-dim);
+    margin-bottom: 6px;
+  }
+  .catalog-card__price {
+    font-size: 13px; font-weight: 800; color: var(--blue-bright);
+  }
+
+  /* ========== МОДАЛКА КАТАЛОГА ========== */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 9999;
-    background: rgba(0,0,0,0.75);
+    background: rgba(0,0,0,0.8);
     display: none; align-items: flex-end;
-    padding: 0;
   }
   .modal-overlay.active { display: flex; }
   .modal-sheet {
     background: var(--black-card);
-    width: 100%; max-height: 90vh; overflow-y: auto;
+    width: 100%; max-height: 92vh; overflow-y: auto;
     border-radius: 18px 18px 0 0;
-    padding: 18px 14px 30px;
     animation: slideUp 0.22s ease;
+    position: relative;
   }
   @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .modal-handle {
-    width: 40px; height: 4px; background: rgba(255,255,255,0.15);
-    border-radius: 4px; margin: 0 auto 14px;
+  .modal-close {
+    position: absolute; top: 12px; right: 12px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid var(--border);
+    color: var(--white);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    z-index: 20;
+    backdrop-filter: blur(10px);
   }
+  .modal-close:hover { background: var(--blue); border-color: var(--blue); }
+
+  .modal-gallery {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--black-soft);
+    overflow: hidden;
+  }
+  .modal-gallery__track {
+    display: flex;
+    height: 100%;
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+  .modal-gallery__slide {
+    flex: 0 0 100%;
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .modal-gallery__slide img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .modal-gallery__arrow {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--border);
+    color: var(--white);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+    user-select: none;
+  }
+  .modal-gallery__arrow:hover { background: var(--blue); border-color: var(--blue); }
+  .modal-gallery__arrow--prev { left: 10px; }
+  .modal-gallery__arrow--next { right: 10px; }
+  .modal-gallery__dots {
+    position: absolute;
+    bottom: 12px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 5px;
+    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 10px; border-radius: 100px;
+    backdrop-filter: blur(10px);
+  }
+  .modal-gallery__dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .modal-gallery__dot.active {
+    background: var(--blue-bright);
+    width: 18px;
+    border-radius: 100px;
+  }
+
+  .modal-body { padding: 18px 14px 24px; }
   .modal-title {
-    font-size: 16px; font-weight: 700; margin-bottom: 4px;
+    font-size: 17px; font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
   }
-  .modal-subtitle {
-    font-size: 11px; color: var(--white-dim); margin-bottom: 14px;
+  .modal-size {
+    display: inline-flex; align-items: center;
+    padding: 5px 10px;
+    background: var(--blue-subtle);
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 100px;
+    font-size: 11px; color: var(--blue-bright);
+    font-weight: 600;
+    margin-bottom: 14px;
   }
-  .modal-status {
-    display: inline-block; padding: 4px 9px; border-radius: 6px;
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.03em; margin-bottom: 14px;
-    background: var(--blue-subtle); color: var(--blue-bright);
+  .modal-players-label {
+    font-size: 10.5px; font-weight: 700; color: var(--white-dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 8px;
   }
-  .modal-status.closed { background: rgba(16,185,129,0.12); color: var(--green); }
-  .modal-status.warn { background: rgba(251,191,36,0.12); color: var(--yellow); }
-
-  .warn-box {
-    background: rgba(251,191,36,0.08);
-    border: 1px solid rgba(251,191,36,0.25);
-    border-radius: 9px;
-    padding: 10px 12px;
-    margin-top: 8px;
-    font-size: 12px;
-    color: rgba(251,191,36,0.9);
-    line-height: 1.5;
+  .modal-players {
+    display: flex; flex-wrap: wrap; gap: 5px;
+    margin-bottom: 14px;
   }
-  .warn-box b { color: var(--yellow); }
-
-  .modal-product {
-    padding: 10px 0; border-top: 1px solid var(--border);
-    font-size: 13px;
+  .modal-player {
+    padding: 4px 10px;
+    background: var(--black-soft);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 11.5px; font-weight: 600;
   }
-  .modal-product:first-of-type { border-top: none; }
-  .modal-product .p-name { font-weight: 600; margin-bottom: 3px; }
-  .modal-product .p-info { font-size: 11.5px; color: var(--white-dim); }
-  .modal-product .p-info a { color: var(--blue-bright); text-decoration: none; }
-  .modal-product .p-price { font-weight: 700; color: var(--blue-bright); float: right; }
-
-  .modal-btn-row { display: flex; gap: 8px; margin-top: 14px; }
-  .modal-btn-row button { flex: 1; }
+  .modal-price-block {
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    margin-bottom: 14px;
+  }
+  .modal-price-label {
+    font-size: 10.5px; color: var(--white-dim);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  .modal-price {
+    font-size: 26px; font-weight: 800;
+    color: var(--blue-bright);
+    letter-spacing: -0.02em;
+  }
+  .modal-actions { display: flex; flex-direction: column; gap: 8px; }
+  .modal-btn {
+    padding: 13px; border: none; border-radius: 9px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: var(--font);
+    text-decoration: none; text-align: center;
+    transition: var(--transition);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .modal-btn--primary {
+    background: var(--blue); color: var(--white);
+  }
+  .modal-btn--primary:hover { background: var(--blue-bright); }
+  .modal-btn--primary:active { transform: scale(0.985); }
+  .modal-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .modal-btn--ghost {
+    background: transparent; color: var(--white);
+    border: 1px solid var(--border);
+  }
+  .modal-btn--ghost:hover {
+    border-color: rgba(59,130,246,0.4);
+    background: var(--blue-subtle);
+  }
 </style>
 </head>
 <body>
@@ -310,12 +476,13 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="calc">Расчёт</div>
+    <div class="tab" data-tab="catalog">Каталог</div>
     <div class="tab" data-tab="orders">Заказы</div>
     <div class="tab" data-tab="bonus">Баллы</div>
     <div class="tab hidden" data-tab="admin" id="admin-tab">Админ</div>
   </div>
 
-  <!-- КАЛЬКУЛЯТОР -->
+  <!-- РАСЧЁТ -->
   <section id="tab-calc">
     <div class="group">
       <div class="field-row">
@@ -331,12 +498,31 @@
       <div class="row total"><span class="row-label">Итого</span><span class="row-value" id="r-total">—</span></div>
     </div>
 
-    <div class="warn-box" style="margin-top:14px;">
-      ⚠️ <b>О доставке.</b><br>
+    <div style="margin-top:14px;padding:12px 14px;border-radius:9px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);font-size:12px;color:rgba(251,191,36,0.95);line-height:1.5;">
+      <b style="color:var(--yellow);">О доставке.</b><br>
       Стоимость доставки рассчитывается по весу и оплачивается отдельно — <b>перед отправлением со склада в Китае</b>. Итоговая сумма может отличаться от предварительной.
     </div>
 
-    <!-- КОНТАКТЫ -->
+    <div class="contacts-footer">
+      <div class="contacts-footer__title">Связаться с нами</div>
+      <div class="contacts-footer__links">
+        <a class="contacts-footer__link" href="https://t.me/kuzz767" target="_blank">
+          <span class="contacts-footer__link-label">Telegram</span>
+          <span class="contacts-footer__link-value">@kuzz767</span>
+        </a>
+        <a class="contacts-footer__link" href="mailto:admin@pacificstyle.ru">
+          <span class="contacts-footer__link-label">Email</span>
+          <span class="contacts-footer__link-value">admin@pacificstyle.ru</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- КАТАЛОГ -->
+  <section id="tab-catalog" class="hidden">
+    <div class="group-title">Товар в наличии</div>
+    <div class="catalog-grid" id="catalog-grid"></div>
+
     <div class="contacts-footer">
       <div class="contacts-footer__title">Связаться с нами</div>
       <div class="contacts-footer__links">
@@ -357,7 +543,6 @@
     <div class="group-title">Мои заказы</div>
     <div class="group" id="orders-list"><div class="empty">Загрузка...</div></div>
 
-    <!-- КОНТАКТЫ -->
     <div class="contacts-footer">
       <div class="contacts-footer__title">Связаться с нами</div>
       <div class="contacts-footer__links">
@@ -384,7 +569,6 @@
     <div class="group-title">История начислений</div>
     <div class="group" id="bonus-log"><div class="empty">Пока пусто</div></div>
 
-    <!-- КОНТАКТЫ -->
     <div class="contacts-footer">
       <div class="contacts-footer__title">Связаться с нами</div>
       <div class="contacts-footer__links">
@@ -400,7 +584,7 @@
     </div>
   </section>
 
-  <!-- АДМИН (без контактов) -->
+  <!-- АДМИН -->
   <section id="tab-admin" class="hidden">
     <div class="group-title">Курс юаня</div>
     <div class="group">
@@ -457,8 +641,38 @@
 <!-- МОДАЛКА ЗАКАЗА -->
 <div class="modal-overlay" id="modal">
   <div class="modal-sheet">
-    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal()">×</button>
     <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- МОДАЛКА КАТАЛОГА -->
+<div class="modal-overlay" id="catalog-modal">
+  <div class="modal-sheet">
+    <button class="modal-close" onclick="closeCatalogModal()">×</button>
+    <div class="modal-gallery" id="catalog-gallery">
+      <div class="modal-gallery__track" id="catalog-track"></div>
+      <button class="modal-gallery__arrow modal-gallery__arrow--prev" id="cat-prev" onclick="catPrevSlide()">‹</button>
+      <button class="modal-gallery__arrow modal-gallery__arrow--next" id="cat-next" onclick="catNextSlide()">›</button>
+      <div class="modal-gallery__dots" id="catalog-dots"></div>
+    </div>
+    <div class="modal-body">
+      <h2 class="modal-title" id="catalog-title"></h2>
+      <div class="modal-size" id="catalog-size"></div>
+      <div id="catalog-players-block"></div>
+      <div class="modal-price-block">
+        <div class="modal-price-label">Цена</div>
+        <div class="modal-price" id="catalog-price"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--primary" id="catalog-order-btn" onclick="orderFromCatalog()">
+          Оформить заказ
+        </button>
+        <a class="modal-btn modal-btn--ghost" href="https://t.me/kuzz767" target="_blank">
+          Написать менеджеру
+        </a>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -491,18 +705,6 @@ async function api(path, opts = {}) {
 
 const fmt = (n) => new Intl.NumberFormat("ru-RU").format(Math.round(n)) + " ₽";
 
-function animateNumber(el, target, suffix = " ₽", duration = 550) {
-  const start = performance.now();
-  function tick(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    el.textContent = new Intl.NumberFormat("ru-RU").format(Math.round(target * eased)) + suffix;
-    if (progress < 1) requestAnimationFrame(tick);
-    else el.textContent = new Intl.NumberFormat("ru-RU").format(Math.round(target)) + suffix;
-  }
-  requestAnimationFrame(tick);
-}
-
 const STATUS_LABELS = {
   created: "Оформлен",
   cn_warehouse: "На складе в Китае",
@@ -510,6 +712,58 @@ const STATUS_LABELS = {
   delivered: "Доставлен",
   closed: "Завершён",
 };
+
+// ========== КАТАЛОГ: ДАННЫЕ ==========
+const CATALOG_PRODUCTS = [
+  {
+    id: 1,
+    title: "Cooper Flag N2",
+    price: 1499,
+    size: "M (175–185)",
+    players: [],
+    photos: ["catalog/product1.jpg", "catalog/product1_2.jpg"]
+  },
+  {
+    id: 2,
+    title: "Wembanyama №1",
+    price: 1499,
+    size: "M (175–185)",
+    players: [],
+    photos: ["catalog/product2.jpg"]
+  },
+  {
+    id: 3,
+    title: "Barcelona 25-26",
+    price: 1499,
+    size: "M",
+    players: ["Lamine Yamal 10"],
+    photos: ["catalog/product3.jpg", "catalog/product3_2.jpg", "catalog/product3_3.jpg"]
+  },
+  {
+    id: 4,
+    title: "Real Madrid 25-26",
+    price: 1499,
+    size: "M",
+    players: ["Ronaldo N7", "Mbappe 10", "Bellingham 5"],
+    photos: ["catalog/product4.jpg", "catalog/product4_2.jpg", "catalog/product4_3.jpg"]
+  },
+  {
+    id: 5,
+    title: "Inter Miami Black 25-26",
+    price: 1499,
+    size: "M",
+    players: ["Messi 10"],
+    photos: ["catalog/product5.jpg", "catalog/product5_2.jpg", "catalog/product5_3.jpg"]
+  },
+  {
+    id: 6,
+    title: "Inter Miami Pink 25-26",
+    price: 1499,
+    size: "M",
+    players: ["Messi 10"],
+    photos: ["catalog/product6.jpg", "catalog/product6_2.jpg", "catalog/product6_3.jpg"]
+  }
+];
 
 // ---------- Tabs ----------
 document.querySelectorAll(".tab").forEach((t) => {
@@ -521,6 +775,7 @@ document.querySelectorAll(".tab").forEach((t) => {
     if (t.dataset.tab === "orders") loadOrders();
     if (t.dataset.tab === "bonus") loadBonus();
     if (t.dataset.tab === "admin") loadAdmin();
+    if (t.dataset.tab === "catalog") renderCatalog();
   });
 });
 
@@ -556,7 +811,156 @@ function calc() {
   const total = product + 599 + 550;
   document.getElementById("r-product").textContent = fmt(product);
   card.classList.remove("hidden");
-  animateNumber(document.getElementById("r-total"), total);
+  document.getElementById("r-total").textContent = fmt(total);
+}
+
+// ---------- КАТАЛОГ ----------
+function renderCatalog() {
+  const grid = document.getElementById("catalog-grid");
+  grid.innerHTML = CATALOG_PRODUCTS.map((p) => `
+    <div class="catalog-card" onclick="openCatalogProduct(${p.id})">
+      <div class="catalog-card__image-wrapper">
+        <img class="catalog-card__image" src="${p.photos[0]}" alt="${p.title}" loading="lazy" onerror="this.style.opacity=0.3;">
+        <div class="catalog-card__badge">В наличии</div>
+        ${p.photos.length > 1 ? `<div class="catalog-card__photos">${p.photos.length}</div>` : ""}
+      </div>
+      <div class="catalog-card__body">
+        <div class="catalog-card__title">${p.title}</div>
+        <div class="catalog-card__size">Размер: ${p.size}</div>
+        <div class="catalog-card__price">${fmt(p.price)}</div>
+      </div>
+    </div>
+  `).join("");
+}
+
+let catProduct = null;
+let catSlide = 0;
+let catTouchStart = 0;
+
+function openCatalogProduct(id) {
+  const p = CATALOG_PRODUCTS.find(x => x.id === id);
+  if (!p) return;
+
+  catProduct = p;
+  catSlide = 0;
+
+  document.getElementById("catalog-title").textContent = p.title;
+  document.getElementById("catalog-size").textContent = "Размер: " + p.size;
+  document.getElementById("catalog-price").textContent = fmt(p.price);
+
+  const playersBlock = document.getElementById("catalog-players-block");
+  if (p.players && p.players.length) {
+    playersBlock.innerHTML = `
+      <div class="modal-players-label">Доступные игроки</div>
+      <div class="modal-players">
+        ${p.players.map(pl => `<span class="modal-player">${pl}</span>`).join("")}
+      </div>
+    `;
+  } else {
+    playersBlock.innerHTML = "";
+  }
+
+  // Галерея
+  const track = document.getElementById("catalog-track");
+  const dots = document.getElementById("catalog-dots");
+  const prevBtn = document.getElementById("cat-prev");
+  const nextBtn = document.getElementById("cat-next");
+
+  track.innerHTML = p.photos.map(src => `
+    <div class="modal-gallery__slide">
+      <img src="${src}" alt="" loading="lazy" onerror="this.style.opacity=0.3;">
+    </div>
+  `).join("");
+
+  if (p.photos.length > 1) {
+    dots.innerHTML = p.photos.map((_, i) =>
+      `<div class="modal-gallery__dot ${i === 0 ? 'active' : ''}" onclick="catGoTo(${i})"></div>`
+    ).join("");
+    dots.style.display = "flex";
+    prevBtn.style.display = "flex";
+    nextBtn.style.display = "flex";
+  } else {
+    dots.innerHTML = "";
+    dots.style.display = "none";
+    prevBtn.style.display = "none";
+    nextBtn.style.display = "none";
+  }
+
+  track.style.transform = "translateX(0)";
+  document.getElementById("catalog-modal").classList.add("active");
+  document.body.style.overflow = "hidden";
+}
+
+function updateCatGallery() {
+  const track = document.getElementById("catalog-track");
+  const dots = document.querySelectorAll(".modal-gallery__dot");
+  track.style.transform = `translateX(-${catSlide * 100}%)`;
+  dots.forEach((d, i) => d.classList.toggle("active", i === catSlide));
+}
+
+function catNextSlide() {
+  if (!catProduct) return;
+  catSlide = (catSlide + 1) % catProduct.photos.length;
+  updateCatGallery();
+}
+function catPrevSlide() {
+  if (!catProduct) return;
+  catSlide = (catSlide - 1 + catProduct.photos.length) % catProduct.photos.length;
+  updateCatGallery();
+}
+function catGoTo(i) {
+  catSlide = i;
+  updateCatGallery();
+}
+
+function closeCatalogModal() {
+  document.getElementById("catalog-modal").classList.remove("active");
+  document.body.style.overflow = "";
+  catProduct = null;
+  catSlide = 0;
+}
+
+// Свайпы
+const catGallery = document.getElementById("catalog-gallery");
+catGallery.addEventListener("touchstart", (e) => {
+  catTouchStart = e.changedTouches[0].screenX;
+}, { passive: true });
+catGallery.addEventListener("touchend", (e) => {
+  const diff = catTouchStart - e.changedTouches[0].screenX;
+  if (Math.abs(diff) > 50) {
+    if (diff > 0) catNextSlide();
+    else catPrevSlide();
+  }
+}, { passive: true });
+
+// ---------- ОФОРМЛЕНИЕ ЗАКАЗА ИЗ КАТАЛОГА ----------
+async function orderFromCatalog() {
+  if (!catProduct) return;
+  const btn = document.getElementById("catalog-order-btn");
+  btn.disabled = true;
+  btn.textContent = "Отправляем...";
+
+  try {
+    await api("/api/catalog/order", {
+      method: "POST",
+      body: JSON.stringify({
+        product_id: catProduct.id,
+        title: catProduct.title,
+        price: catProduct.price,
+        size: catProduct.size,
+        players: catProduct.players
+      })
+    });
+    tg?.HapticFeedback?.notificationOccurred("success");
+    closeCatalogModal();
+    alert("Заявка отправлена. Менеджер свяжется с вами в ближайшее время.");
+  } catch (e) {
+    tg?.HapticFeedback?.notificationOccurred("error");
+    alert("Ошибка: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Оформить заказ";
+  }
 }
 
 // ---------- Заказы пользователя ----------
@@ -568,18 +972,15 @@ async function loadOrders() {
       el.innerHTML = `<div class="empty">Заказов пока нет</div>`;
       return;
     }
-    el.innerHTML = list
-      .map(
-        (o) => `
+    el.innerHTML = list.map((o) => `
       <div class="order-row" onclick="openOrderModal(${o.id})">
         <div class="top-line">
           <span class="status">${STATUS_LABELS[o.status] || o.status} · #${o.id}</span>
           <span class="total">${fmt(o.total_rub)}</span>
         </div>
         <div class="meta">${o.created_at} · ${o.products.length} товар(ов)</div>
-      </div>`
-      )
-      .join("");
+      </div>
+    `).join("");
   } catch (e) {
     console.error(e);
   }
@@ -594,15 +995,12 @@ async function loadBonus() {
     el.innerHTML = `<div class="empty">Пока пусто</div>`;
     return;
   }
-  el.innerHTML = data.log
-    .map(
-      (b) => `
+  el.innerHTML = data.log.map((b) => `
     <div class="user-row">
       <div class="user-left">${b.reason || "—"}</div>
       <div class="user-right">+${b.amount} · ${b.created_at}</div>
-    </div>`
-    )
-    .join("");
+    </div>
+  `).join("");
 }
 
 // ---------- Админ ----------
@@ -611,25 +1009,23 @@ async function loadAdmin() {
   try {
     const users = await api("/api/admin/users");
 
-    document.getElementById("admin-users").innerHTML = users
-      .map((u) => {
-        const isMe = u.id === ME.id;
-        return `
-        <div class="user-row">
-          <div class="user-left">
-            <span>
-              ${u.first_name || "—"}
-              ${u.username ? `<span style="opacity:.6"> @${u.username}</span>` : ""}
-              ${u.is_admin ? `<span class="badge admin">ADMIN</span>` : ""}
-            </span>
-          </div>
-          <div class="user-right">
-            <span style="font-size:11px;color:var(--white-dim);">${u.bonus_points} б.</span>
-            ${!isMe ? `<button class="badge-btn ${u.is_admin ? 'danger' : ''}" onclick="toggleAdmin(${u.id}, ${u.is_admin ? 0 : 1})">${u.is_admin ? 'Снять' : 'Админ'}</button>` : ''}
-          </div>
-        </div>`;
-      })
-      .join("");
+    document.getElementById("admin-users").innerHTML = users.map((u) => {
+      const isMe = u.id === ME.id;
+      return `
+      <div class="user-row">
+        <div class="user-left">
+          <span>
+            ${u.first_name || "—"}
+            ${u.username ? `<span style="opacity:.6"> @${u.username}</span>` : ""}
+            ${u.is_admin ? `<span class="badge admin">ADMIN</span>` : ""}
+          </span>
+        </div>
+        <div class="user-right">
+          <span style="font-size:11px;color:var(--white-dim);">${u.bonus_points} б.</span>
+          ${!isMe ? `<button class="badge-btn ${u.is_admin ? 'danger' : ''}" onclick="toggleAdmin(${u.id}, ${u.is_admin ? 0 : 1})">${u.is_admin ? 'Снять' : 'Админ'}</button>` : ''}
+        </div>
+      </div>`;
+    }).join("");
 
     document.getElementById("bonus-user").innerHTML = users
       .map((u) => `<option value="${u.id}">${u.first_name} (${u.bonus_points} б.)</option>`)
@@ -645,18 +1041,15 @@ async function loadAdmin() {
       oEl.innerHTML = `<div class="empty">Заказов нет</div>`;
       return;
     }
-    oEl.innerHTML = orders
-      .map(
-        (o) => `
+    oEl.innerHTML = orders.map((o) => `
       <div class="order-row" onclick="openOrderModal(${o.id}, true)">
         <div class="top-line">
           <span class="status">#${o.id} · ${STATUS_LABELS[o.status] || o.status}</span>
           <span class="total">${fmt(o.total_rub)}</span>
         </div>
         <div class="meta">${o.created_at}</div>
-      </div>`
-      )
-      .join("");
+      </div>
+    `).join("");
   } catch (e) {
     alert("Ошибка загрузки админки: " + e.message);
   }
@@ -699,7 +1092,7 @@ window.saveDelivery = async (orderId) => {
       body: JSON.stringify({ delivery }),
     });
     tg?.HapticFeedback?.notificationOccurred("success");
-    alert(`✅ Доставка обновлена.\n\nИтого: ${Math.round(res.total_rub)} ₽`);
+    alert(`Доставка обновлена.\n\nИтого: ${Math.round(res.total_rub)} ₽`);
     closeModal();
     loadAdmin();
   } catch (e) {
@@ -715,21 +1108,20 @@ async function openOrderModal(orderId, adminView = false) {
     const isCnWarehouse = order.status === "cn_warehouse";
     const statusClass = isClosed ? "closed" : (isCnWarehouse ? "warn" : "");
 
-    const productsHtml = order.products
-      .map(
-        (p) => `
-        <div class="modal-product">
-          <div class="p-name">${p.title || "—"} <span class="p-price">${Math.round(p.price_cny * order.cny_rate)} ₽</span></div>
-          <div class="p-info">
-            ${p.price_cny} ¥ × ${p.quantity} шт
-            ${p.url ? ` · <a href="${p.url}" target="_blank">ссылка</a>` : ""}
-          </div>
-        </div>`
-      )
-      .join("");
+    const productsHtml = order.products.map((p) => `
+      <div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;">
+        <div style="font-weight:600;margin-bottom:3px;">
+          ${p.title || "—"}
+          <span style="font-weight:700;color:var(--blue-bright);float:right;">${Math.round(p.price_cny * order.cny_rate)} ₽</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--white-dim);">
+          ${p.price_cny} ¥ × ${p.quantity} шт
+          ${p.url ? ` · <a href="${p.url}" target="_blank" style="color:var(--blue-bright);text-decoration:none;">ссылка</a>` : ""}
+        </div>
+      </div>
+    `).join("");
 
-    const adminBlock = adminView && ME?.is_admin
-      ? `
+    const adminBlock = adminView && ME?.is_admin ? `
       <div class="group-title" style="margin-top:14px;">Управление</div>
       <div class="group">
         <div class="field-row">
@@ -742,43 +1134,42 @@ async function openOrderModal(orderId, adminView = false) {
         <div class="field-row">
           <label>Изменить статус</label>
           <select class="boxed-input" onchange="changeStatus(${order.id}, this.value)" style="margin-top:6px;">
-            ${Object.entries(STATUS_LABELS)
-              .map(([k, v]) => `<option value="${k}" ${k === order.status ? "selected" : ""}>${v}</option>`)
-              .join("")}
+            ${Object.entries(STATUS_LABELS).map(([k, v]) =>
+              `<option value="${k}" ${k === order.status ? "selected" : ""}>${v}</option>`
+            ).join("")}
           </select>
         </div>
-      </div>`
-      : "";
+      </div>
+    ` : "";
 
     document.getElementById("modal-content").innerHTML = `
-      <div class="modal-title">Заказ #${order.id}</div>
-      <div class="modal-subtitle">${order.created_at}</div>
-      <div class="modal-status ${statusClass}">${STATUS_LABELS[order.status] || order.status}</div>
-
-      ${isCnWarehouse ? `<div class="warn-box">📦 Товар прибыл на склад в Китае. Необходимо оплатить доставку перед отправкой в ваш город.</div>` : ""}
-
-      <div class="group-title" style="margin-top:6px;">Товары</div>
-      <div class="group" style="padding:0 14px;">
-        ${productsHtml}
-      </div>
-
-      <div class="group-title">Стоимость</div>
-      <div class="group">
-        <div class="row"><span class="row-label">Товары (${order.cny_rate.toFixed(2)} ₽/¥)</span><span class="row-value">${fmt(order.products.reduce((s, p) => s + p.price_cny * p.quantity, 0) * order.cny_rate)}</span></div>
-        <div class="row"><span class="row-label">Доставка</span><span class="row-value">${fmt(order.delivery)}</span></div>
-        <div class="row"><span class="row-label">Комиссия</span><span class="row-value">${fmt(order.commission)}</span></div>
-        <div class="row total"><span class="row-label">Итого</span><span class="row-value">${fmt(order.total_rub)}</span></div>
-      </div>
-
-      ${adminBlock}
-
-      <div class="modal-btn-row">
-        <button class="primary" onclick="closeModal()">Закрыть</button>
+      <div style="padding:18px 14px 0;">
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Заказ #${order.id}</div>
+        <div style="font-size:11px;color:var(--white-dim);margin-bottom:14px;">${order.created_at}</div>
+        <div style="display:inline-block;padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:14px;background:var(--blue-subtle);color:var(--blue-bright);">
+          ${STATUS_LABELS[order.status] || order.status}
+        </div>
+        ${isCnWarehouse ? `<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:9px;padding:10px 12px;margin-top:8px;font-size:12px;color:rgba(251,191,36,0.9);line-height:1.5;">Товар прибыл на склад в Китае. Необходимо оплатить доставку перед отправкой в ваш город.</div>` : ""}
+        <div class="group-title" style="margin-top:14px;">Товары</div>
+        <div style="padding:0 14px;border:1px solid var(--border);border-radius:12px;background:var(--black-card);overflow:hidden;">
+          ${productsHtml}
+        </div>
+        <div class="group-title" style="margin-top:14px;">Стоимость</div>
+        <div class="group">
+          <div class="row"><span class="row-label">Товары (${order.cny_rate.toFixed(2)} ₽/¥)</span><span class="row-value">${fmt(order.products.reduce((s, p) => s + p.price_cny * p.quantity, 0) * order.cny_rate)}</span></div>
+          <div class="row"><span class="row-label">Доставка</span><span class="row-value">${fmt(order.delivery)}</span></div>
+          <div class="row"><span class="row-label">Комиссия</span><span class="row-value">${fmt(order.commission)}</span></div>
+          <div class="row total"><span class="row-label">Итого</span><span class="row-value">${fmt(order.total_rub)}</span></div>
+        </div>
+        ${adminBlock}
+        <div style="display:flex;gap:8px;margin-top:14px;padding-bottom:20px;">
+          <button class="primary" onclick="closeModal()">Закрыть</button>
+        </div>
       </div>
     `;
 
     document.getElementById("modal").classList.add("active");
-    try { tg?.BackButton?.show(); tg?.BackButton?.onClick(closeModal); } catch (e) {}
+    document.body.style.overflow = "hidden";
   } catch (e) {
     alert("Ошибка: " + e.message);
   }
@@ -787,7 +1178,7 @@ window.openOrderModal = openOrderModal;
 
 function closeModal() {
   document.getElementById("modal").classList.remove("active");
-  try { tg?.BackButton?.hide(); } catch (e) {}
+  document.body.style.overflow = "";
 }
 window.closeModal = closeModal;
 
@@ -799,9 +1190,9 @@ document.getElementById("btn-save-rate").onclick = async () => {
     await api("/api/admin/rate", { method: "POST", body: JSON.stringify({ rate }) });
     await loadRate();
     tg?.HapticFeedback?.notificationOccurred("success");
-    alert(`✅ Курс сохранён: 1 ¥ = ${rate} ₽`);
+    alert(`Курс сохранён: 1 ¥ = ${rate} ₽`);
   } catch (e) {
-    alert("❌ Ошибка: " + e.message);
+    alert("Ошибка: " + e.message);
   }
 };
 
@@ -813,7 +1204,7 @@ document.getElementById("btn-search-order").onclick = async () => {
     await openOrderModal(id, true);
     document.getElementById("search-order-id").value = "";
   } catch (e) {
-    alert("❌ " + e.message);
+    alert(e.message);
   }
 };
 
@@ -831,10 +1222,10 @@ document.getElementById("btn-award").onclick = async () => {
     document.getElementById("bonus-amount").value = "";
     document.getElementById("bonus-reason").value = "";
     tg?.HapticFeedback?.notificationOccurred("success");
-    alert("✅ Начислено");
+    alert("Начислено");
     loadAdmin();
   } catch (e) {
-    alert("❌ Ошибка: " + e.message);
+    alert("Ошибка: " + e.message);
   }
 };
 
@@ -844,7 +1235,7 @@ let productIndex = 0;
 function addProductRow() {
   productIndex++;
   const html = `
-    <div class="product-row" data-idx="${productIndex}">
+    <div class="product-row-form" data-idx="${productIndex}">
       <div class="product-grid">
         <input type="text" class="p-title boxed-input" placeholder="Название товара">
         <input type="text" class="p-url boxed-input" placeholder="Ссылка на Poizon">
@@ -868,7 +1259,7 @@ document.getElementById("btn-create-order").onclick = async () => {
   const delivery = parseFloat(document.getElementById("order-delivery").value) || 599;
 
   const products = [];
-  document.querySelectorAll("#order-products .product-row").forEach((row) => {
+  document.querySelectorAll("#order-products .product-row-form").forEach((row) => {
     const title = row.querySelector(".p-title").value.trim();
     const url = row.querySelector(".p-url").value.trim();
     const photo_url = row.querySelector(".p-photo").value.trim();
@@ -886,13 +1277,13 @@ document.getElementById("btn-create-order").onclick = async () => {
       body: JSON.stringify({ user_id, products, commission, delivery }),
     });
     tg?.HapticFeedback?.notificationOccurred("success");
-    alert(`✅ Заказ №${res.order_id} создан.\n\nСумма: ${Math.round(res.total_rub)} ₽`);
+    alert(`Заказ №${res.order_id} создан.\n\nСумма: ${Math.round(res.total_rub)} ₽`);
     document.getElementById("order-products").innerHTML = "";
     productIndex = 0;
     addProductRow();
     loadAdmin();
   } catch (e) {
-    alert("❌ Ошибка: " + e.message);
+    alert("Ошибка: " + e.message);
   }
 };
 
@@ -900,11 +1291,15 @@ document.getElementById("btn-create-order").onclick = async () => {
 document.getElementById("modal").addEventListener("click", (e) => {
   if (e.target.id === "modal") closeModal();
 });
+document.getElementById("catalog-modal").addEventListener("click", (e) => {
+  if (e.target.id === "catalog-modal") closeCatalogModal();
+});
 
 (async () => {
   await loadMe();
   await loadRate();
   await loadOrders();
+  renderCatalog();
   if (ME?.is_admin) {
     await loadAdmin();
     addProductRow();
